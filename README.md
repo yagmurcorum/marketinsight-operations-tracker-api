@@ -1,4 +1,4 @@
-````md
+
 # MarketInsight Operations Tracker API
 
 MarketInsight Operations Tracker API is a learning-focused .NET backend project designed for pre-internship preparation.
