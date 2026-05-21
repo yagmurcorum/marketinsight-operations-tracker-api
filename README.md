@@ -41,6 +41,7 @@ Current phase:
 
 ```text
 Week 1 - Project Setup, REST API Basics, Swagger, XML Summary, and Documentation Foundation
+
 ````
 
 Current focus:
