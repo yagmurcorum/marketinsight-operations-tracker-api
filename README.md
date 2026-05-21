@@ -1,4 +1,3 @@
-
 ````md
 # MarketInsight Operations Tracker API
 
@@ -229,7 +228,5 @@ First build a simple working structure, then improve it gradually.
 ```
 
 The focus is on understanding backend development concepts step by step without adding unnecessary complexity too early.
-
-````
 
 ````
