@@ -1,11 +1,19 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
 namespace MarketInsight.Api.Controllers;
+/// <summary>
+/// Provides basic health information about the MarketInsight Operations Tracker API.
+/// </summary>
 
 [ApiController]
 [Route("api/health")]
-public class  HealthController:ControllerBase
+public class  HealthController : ControllerBase
 {
+    /// <summary>
+    /// Checks whether the API is running       
+    /// </summary>
+    /// <returns>Basic health information about the API </returns>
+
     [HttpGet]
     public IActionResult GetHealth()
     {
