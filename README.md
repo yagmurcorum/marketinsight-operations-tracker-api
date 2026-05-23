@@ -46,9 +46,10 @@ Current focus:
 - Controller-based request handling
 - Swagger/OpenAPI endpoint verification
 - Initial health endpoint implementation
+- XML Summary and Swagger documentation setup
+- Initial controller endpoint expansion
 - Initial technical documentation structure
 - Clean repository structure
-- XML Summary and Swagger documentation setup
 
 ---
 
@@ -95,8 +96,11 @@ Key decisions:
 | Method | Route | Description |
 |---|---|---|
 | GET | `/api/health` | Returns basic API health information |
+| GET | `/api/system/info` | Returns basic application and environment information |
 
 The `GET /api/health` endpoint verifies that the API is running and reachable through Swagger.
+
+The `GET /api/system/info` endpoint returns basic system information such as application name, version, and runtime environment.
 
 ---
 
@@ -109,6 +113,7 @@ Current documentation files:
 - `docs/01-project-overview.md`
 - `docs/02-http-rest-lifecycle.md`
 - `docs/03-xml-summary-swagger-standard.md`
+- `docs/04-api-endpoint-draft.md`
 
 ---
 
@@ -171,12 +176,14 @@ The full folder structure will be created gradually as the project progresses. E
     ├── docs/
     │   ├── 01-project-overview.md
     │   ├── 02-http-rest-lifecycle.md
-    │   └── 03-xml-summary-swagger-standard.md
+    │   ├── 03-xml-summary-swagger-standard.md
+    │   └── 04-api-endpoint-draft.md
     │
     ├── src/
     │   └── MarketInsight.Api/
     │       ├── Controllers/
-    │       │   └── HealthController.cs
+    │       │   ├── HealthController.cs
+    │       │   └── SystemController.cs
     │       ├── Properties/
     │       ├── appsettings.Development.json
     │       ├── appsettings.json
@@ -214,7 +221,10 @@ Current Week 1 progress:
 - XML documentation output is enabled.
 - Swagger is configured to read XML comments.
 - `GET /api/health` now includes XML Summary documentation.
-
+- `GET /api/system/info` endpoint is implemented and verified.
+- `SystemController` is created.
+- Initial controller endpoint documentation is added.
+ 
 ---
 
 ## Initial Setup Notes
