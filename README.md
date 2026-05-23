@@ -48,6 +48,7 @@ Current focus:
 - Initial health endpoint implementation
 - Initial technical documentation structure
 - Clean repository structure
+- XML Summary and Swagger documentation setup
 
 ---
 
@@ -107,6 +108,7 @@ Current documentation files:
 
 - `docs/01-project-overview.md`
 - `docs/02-http-rest-lifecycle.md`
+- `docs/03-xml-summary-swagger-standard.md`
 
 ---
 
@@ -168,7 +170,8 @@ The full folder structure will be created gradually as the project progresses. E
     │
     ├── docs/
     │   ├── 01-project-overview.md
-    │   └── 02-http-rest-lifecycle.md
+    │   ├── 02-http-rest-lifecycle.md
+    │   └── 03-xml-summary-swagger-standard.md
     │
     ├── src/
     │   └── MarketInsight.Api/
@@ -208,6 +211,9 @@ Current Week 1 progress:
 - Swagger/OpenAPI is enabled.
 - `GET /api/health` endpoint is implemented and verified.
 - Initial project documentation is started.
+- XML documentation output is enabled.
+- Swagger is configured to read XML comments.
+- `GET /api/health` now includes XML Summary documentation.
 
 ---
 
