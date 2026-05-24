@@ -49,6 +49,7 @@ Current focus:
 - XML Summary and Swagger documentation setup
 - Initial controller endpoint expansion
 - Initial technical documentation structure
+- Week 1 review and mini demo preparation
 - Clean repository structure
 
 ---
@@ -114,6 +115,7 @@ Current documentation files:
 - `docs/02-http-rest-lifecycle.md`
 - `docs/03-xml-summary-swagger-standard.md`
 - `docs/04-api-endpoint-draft.md`
+- `docs/week-1-summary.md`
 
 ---
 
@@ -177,7 +179,8 @@ The full folder structure will be created gradually as the project progresses. E
     │   ├── 01-project-overview.md
     │   ├── 02-http-rest-lifecycle.md
     │   ├── 03-xml-summary-swagger-standard.md
-    │   └── 04-api-endpoint-draft.md
+    │   ├── 04-api-endpoint-draft.md
+    │   └── week-1-summary.md
     │
     ├── src/
     │   └── MarketInsight.Api/
@@ -224,7 +227,9 @@ Current Week 1 progress:
 - `GET /api/system/info` endpoint is implemented and verified.
 - `SystemController` is created.
 - Initial controller endpoint documentation is added.
- 
+- Week 1 endpoints are reviewed and verified through Swagger.
+- Week 1 summary documentation is added.
+
 ---
 
 ## Initial Setup Notes
