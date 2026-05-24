@@ -164,7 +164,11 @@ Current documentation files:
 
 Note:
 
+The planned repository structure represents the target structure of the project.
+
 The full folder structure will be created gradually as the project progresses. Empty folders will not be added unnecessarily.
+
+Current Week 1 documentation files are kept directly under the `docs/` folder. Topic-based documentation folders will be introduced when the related project areas are implemented.
 
 ---
 
