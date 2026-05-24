@@ -98,6 +98,35 @@ The action responds to:
 
 ---
 
+## XML Summary and Response Metadata
+
+The health endpoint uses XML Summary documentation to describe the controller and action method.
+
+Controller summary:
+
+    Provides basic health information about the MarketInsight Operations Tracker API.
+
+Action summary:
+
+    Checks whether the API is running.
+
+The endpoint also includes response metadata:
+
+    [ProducesResponseType(StatusCodes.Status200OK)]
+
+This metadata helps Swagger/OpenAPI display the expected successful response status code for the endpoint.
+
+The actual HTTP response is returned by:
+
+    return Ok(response);
+
+This means:
+
+- `ProducesResponseType` documents the expected response status.
+- `Ok(response)` returns the actual `200 OK` response.
+
+---
+
 ## Swagger Verification
 
 The endpoint was tested through Swagger.
@@ -116,6 +145,8 @@ This confirms that:
 - The route is reachable.
 - The controller is registered correctly.
 - Swagger can call the endpoint.
+- XML Summary documentation is visible in Swagger.
+- The expected `200 OK` response metadata is documented.
 - The API returns a valid HTTP response.
 
 ---
@@ -139,4 +170,4 @@ The following topics are outside the scope of this document and will be document
 
 ## Status
 
-The health endpoint is implemented and verified through Swagger.
+The health endpoint is implemented, documented with XML Summary, enriched with `200 OK` response metadata, and verified through Swagger.
