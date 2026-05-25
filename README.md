@@ -43,12 +43,13 @@ Current phase:
 Current focus:
 
 - Entity and DTO model design
-- Watchlist data model foundation
-- Price tracking model foundation
-- Entity relationship preparation
-- SQLite and EF Core preparation
+- SQLite and EF Core setup
+- AppDbContext configuration
+- Initial EF Core migration
+- SQLite database creation
+- Repository Pattern preparation
 - Watchlist CRUD preparation
-- Technical documentation update for database entity design
+- Technical documentation update for database setup
 
 ---
 
@@ -123,6 +124,42 @@ Current DTO models:
 
 ---
 
+## Implemented Database Setup
+
+The project is configured to use SQLite as the persistent database through Entity Framework Core.
+
+Implemented database setup:
+
+| Item | Status |
+|---|---|
+| EF Core packages added | Completed |
+| SQLite provider configured | Completed |
+| `AppDbContext` created | Completed |
+| DbSet definitions added | Completed |
+| SQLite connection string configured | Completed |
+| Initial EF Core migration created | Completed |
+| SQLite database generated locally | Completed |
+| SQLite database files excluded from Git | Completed |
+
+Current DbSet definitions:
+
+| DbSet | Entity |
+|---|---|
+| `WatchlistItems` | `WatchlistItem` |
+| `PriceSnapshots` | `PriceSnapshot` |
+| `PriceAlerts` | `PriceAlert` |
+| `ActionItems` | `ActionItem` |
+
+Local SQLite database file:
+
+    src/MarketInsight.Api/marketinsight.db
+
+The SQLite database file is ignored by Git.
+
+Migration files are committed because they describe the database schema.
+
+---
+
 ## Documentation
 
 Project documentation is maintained under the `docs/` folder.
@@ -134,6 +171,7 @@ Current documentation files:
 - `docs/03-xml-summary-swagger-standard.md`
 - `docs/04-api-endpoint-draft.md`
 - `docs/05-database-entity-design.md`
+- `docs/06-ef-core-sqlite-setup.md`
 - `docs/week-1-summary.md`
 
 ---
@@ -204,6 +242,7 @@ Current documentation files are kept directly under the `docs/` folder. Topic-ba
     │   ├── 03-xml-summary-swagger-standard.md
     │   ├── 04-api-endpoint-draft.md
     │   ├── 05-database-entity-design.md
+    │   ├── 06-ef-core-sqlite-setup.md
     │   └── week-1-summary.md
     │
     ├── src/
@@ -211,6 +250,9 @@ Current documentation files are kept directly under the `docs/` folder. Topic-ba
     │       ├── Controllers/
     │       │   ├── HealthController.cs
     │       │   └── SystemController.cs
+    │       │
+    │       ├── Data/
+    │       │   └── AppDbContext.cs
     │       │
     │       ├── DTOs/
     │       │   └── Watchlist/
@@ -223,6 +265,10 @@ Current documentation files are kept directly under the `docs/` folder. Topic-ba
     │       │   ├── PriceSnapshot.cs
     │       │   └── WatchlistItem.cs
     │       │
+    │       ├── Migrations/
+    │       │   ├── *_InitialCreate.cs
+    │       │   └── AppDbContextModelSnapshot.cs
+    │       │
     │       ├── Properties/
     │       ├── appsettings.Development.json
     │       ├── appsettings.json
@@ -233,6 +279,14 @@ Current documentation files are kept directly under the `docs/` folder. Topic-ba
     ├── .gitignore
     ├── README.md
     └── MarketInsight.OperationsTracker.sln
+
+Note:
+
+The local SQLite database file is generated under the API project folder but is not included in Git:
+
+    src/MarketInsight.Api/marketinsight.db
+
+SQLite database files are ignored through `.gitignore`.
 
 ---
 
@@ -298,7 +352,17 @@ Current Week 2 progress:
 - Entity and DTO separation is documented.
 - Initial entity relationships are documented.
 - `docs/05-database-entity-design.md` is created.
-- Project build is verified successfully after adding the initial entity and DTO models.
+- EF Core packages are added.
+- `Data` folder is created.
+- `AppDbContext` is created.
+- DbSet definitions are added.
+- SQLite connection string is configured.
+- `AppDbContext` is registered in `Program.cs`.
+- `InitialCreate` migration is created.
+- SQLite database is created locally.
+- SQLite database files are excluded from Git tracking.
+- `docs/06-ef-core-sqlite-setup.md` is created.
+- Project build is verified successfully after configuring SQLite and EF Core.
 
 ---
 
