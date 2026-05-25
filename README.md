@@ -38,19 +38,17 @@ At the end of the 4-week plan, the API should be able to:
 
 Current phase:
 
-    Week 1 - Project Setup, REST API Basics, Swagger, XML Summary, and Documentation Foundation
+    Week 2 - Entity, DTO, SQLite, EF Core, Repository Pattern, and Watchlist CRUD Foundation
 
 Current focus:
 
-- ASP.NET Core Web API project structure
-- Controller-based request handling
-- Swagger/OpenAPI endpoint verification
-- Initial health endpoint implementation
-- XML Summary and Swagger documentation setup
-- Initial controller endpoint expansion
-- Initial technical documentation structure
-- Week 1 review and mini demo preparation
-- Clean repository structure
+- Entity and DTO model design
+- Watchlist data model foundation
+- Price tracking model foundation
+- Entity relationship preparation
+- SQLite and EF Core preparation
+- Watchlist CRUD preparation
+- Technical documentation update for database entity design
 
 ---
 
@@ -105,6 +103,26 @@ The `GET /api/system/info` endpoint returns basic system information such as app
 
 ---
 
+## Implemented Models
+
+Current entity models:
+
+| Entity | Purpose |
+|---|---|
+| `WatchlistItem` | Represents a financial symbol tracked by the user |
+| `PriceSnapshot` | Represents a persistent price history record for a tracked financial symbol |
+| `PriceAlert` | Represents a price alert rule defined for a tracked financial symbol |
+| `ActionItem` | Represents an operational follow-up action created after a price alert or important price event |
+
+Current DTO models:
+
+| DTO | Purpose |
+|---|---|
+| `CreateWatchlistItemRequest` | Represents the request body used to add a new financial symbol to the watchlist |
+| `WatchlistItemResponse` | Represents the response model returned for a watchlist item |
+
+---
+
 ## Documentation
 
 Project documentation is maintained under the `docs/` folder.
@@ -115,6 +133,7 @@ Current documentation files:
 - `docs/02-http-rest-lifecycle.md`
 - `docs/03-xml-summary-swagger-standard.md`
 - `docs/04-api-endpoint-draft.md`
+- `docs/05-database-entity-design.md`
 - `docs/week-1-summary.md`
 
 ---
@@ -168,7 +187,7 @@ The planned repository structure represents the target structure of the project.
 
 The full folder structure will be created gradually as the project progresses. Empty folders will not be added unnecessarily.
 
-Current Week 1 documentation files are kept directly under the `docs/` folder. Topic-based documentation folders will be introduced when the related project areas are implemented.
+Current documentation files are kept directly under the `docs/` folder. Topic-based documentation folders will be introduced when the related project areas are implemented.
 
 ---
 
@@ -184,6 +203,7 @@ Current Week 1 documentation files are kept directly under the `docs/` folder. T
     │   ├── 02-http-rest-lifecycle.md
     │   ├── 03-xml-summary-swagger-standard.md
     │   ├── 04-api-endpoint-draft.md
+    │   ├── 05-database-entity-design.md
     │   └── week-1-summary.md
     │
     ├── src/
@@ -191,6 +211,18 @@ Current Week 1 documentation files are kept directly under the `docs/` folder. T
     │       ├── Controllers/
     │       │   ├── HealthController.cs
     │       │   └── SystemController.cs
+    │       │
+    │       ├── DTOs/
+    │       │   └── Watchlist/
+    │       │       ├── CreateWatchlistItemRequest.cs
+    │       │       └── WatchlistItemResponse.cs
+    │       │
+    │       ├── Entities/
+    │       │   ├── ActionItem.cs
+    │       │   ├── PriceAlert.cs
+    │       │   ├── PriceSnapshot.cs
+    │       │   └── WatchlistItem.cs
+    │       │
     │       ├── Properties/
     │       ├── appsettings.Development.json
     │       ├── appsettings.json
@@ -233,6 +265,40 @@ Current Week 1 progress:
 - Initial controller endpoint documentation is added.
 - Week 1 endpoints are reviewed and verified through Swagger.
 - Week 1 summary documentation is added.
+
+---
+
+## Week 2 Goals
+
+By the end of Week 2, the project should include:
+
+- Initial entity models
+- Initial DTO models
+- SQLite and EF Core setup
+- DbContext configuration
+- Initial EF Core migration
+- Repository Pattern implementation
+- Watchlist CRUD endpoints:
+  - `GET /api/watchlist`
+  - `GET /api/watchlist/{symbol}`
+  - `POST /api/watchlist`
+  - `DELETE /api/watchlist/{symbol}`
+- Database and entity design documentation
+
+Current Week 2 progress:
+
+- `Entities` folder is created.
+- `DTOs/Watchlist` folder is created.
+- `WatchlistItem` entity is created.
+- `PriceSnapshot` entity is created.
+- `PriceAlert` entity is created.
+- `ActionItem` entity is created.
+- `CreateWatchlistItemRequest` DTO is created.
+- `WatchlistItemResponse` DTO is created.
+- Entity and DTO separation is documented.
+- Initial entity relationships are documented.
+- `docs/05-database-entity-design.md` is created.
+- Project build is verified successfully after adding the initial entity and DTO models.
 
 ---
 
