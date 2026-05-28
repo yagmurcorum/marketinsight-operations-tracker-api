@@ -1,3 +1,5 @@
+
+using MarketInsight.Api.Services;
 using System.Reflection;
 using MarketInsight.Api.Data;
 using MarketInsight.Api.Repositories;
@@ -11,6 +13,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IWatchlistItemRepository, WatchlistItemRepository>();
+builder.Services.AddScoped<IWatchlistItemService, WatchlistItemService>();
 
 builder.Services.AddEndpointsApiExplorer();
 
