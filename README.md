@@ -1,55 +1,107 @@
 # MarketInsight Operations Tracker API
 
-MarketInsight Operations Tracker API is a learning-focused .NET backend project designed for preparation.
+MarketInsight Operations Tracker API is a learning-focused backend API project built with ASP.NET Core Web API.
 
-The project aims to practice backend development fundamentals through a small but realistic MVP that includes API design, documentation, persistence, caching, asynchronous processing, logging, and basic observability.
+The project is designed to practice professional backend development concepts through a small financial tracking domain.
+
+This repository contains only the backend API component of the MarketInsight Operations Tracker learning project.
+
+---
+
+## Repository Scope
+
+This repository represents:
+
+- A learning-focused backend API
+- A .NET 8 ASP.NET Core Web API project
+- A backend practice project for API design, persistence, caching, messaging, logging, observability, and documentation
+
+This repository does not represent:
+
+- A frontend application
+- A mobile application
+- A complete commercial product
+- A production-grade financial trading platform
+- A real trading or portfolio management system
+- A system that provides financial advice
+
+---
+
+## Domain Definition
+
+MarketInsight Operations Tracker is a learning-focused backend API that tracks financial symbols, retrieves market quote data, stores price snapshots, evaluates price alerts, and creates operational action items for important market events.
+
+The main domain concepts are:
+
+| Domain Concept | Meaning |
+|---|---|
+| `WatchlistItem` | A financial symbol tracked by the system |
+| `PriceSnapshot` | A saved price record for a tracked symbol |
+| `PriceAlert` | A price condition defined for a tracked symbol |
+| `ActionItem` | An operational follow-up task created after an alert or important market event |
+
+The main entity is:
+
+    WatchlistItem
+
+All price tracking, alerting, and operational follow-up behavior starts from a tracked financial symbol.
 
 ---
 
 ## Project Goal
 
-The main goal of this project is not to build a production-grade financial platform.
+The goal of this project is not to build a production-grade financial product.
 
 The goal is to learn how a backend API is structured, developed, tested, documented, and tracked in a professional workflow.
 
-This project follows a 4-week MVP development plan.
+The project focuses on practicing:
+
+- ASP.NET Core Web API fundamentals
+- HTTP and REST API design
+- Controller-based API development
+- Swagger / OpenAPI documentation
+- XML Summary documentation
+- Entity and DTO separation
+- SQLite and EF Core persistence
+- Repository Pattern and LINQ queries
+- Public API integration
+- Redis caching
+- RabbitMQ asynchronous messaging
+- Background Worker processing
+- Logging and basic observability
+- GitHub Issues and GitHub Projects tracking
+- Technical documentation discipline
 
 ---
 
-## MVP Scope
+## Architecture Style
 
-At the end of the 4-week plan, the API should be able to:
+The project follows a learning-focused layered monolith architecture.
 
-- Manage a financial symbol watchlist
-- Retrieve quote data from a public finance API
-- Cache quote data in Redis
-- Log cache hit and cache miss behavior
-- Persist price snapshots in SQLite
-- Send async price refresh messages to RabbitMQ
-- Process queue messages with a Background Worker
-- Provide health check and dependency status endpoints
-- Display Swagger/OpenAPI documentation
-- Use XML Summary comments for API documentation
-- Track work with GitHub Issues and GitHub Projects
+This means:
 
----
+- The application is developed as a single backend API.
+- The code is separated into clear responsibility layers.
+- The project does not use a microservice architecture.
+- The main goal is to learn backend responsibility separation step by step.
 
-## Current Phase
+Main layers:
 
-Current phase:
+| Layer | Responsibility |
+|---|---|
+| Controller | Handles HTTP request and response flow |
+| Service | Handles use cases and business rules |
+| Repository | Handles database access |
+| Entity | Represents database persistence model |
+| DTO | Represents API request and response contract |
 
-    Week 2 - Entity, DTO, SQLite, EF Core, Repository Pattern, and Watchlist CRUD Foundation
+Core rule:
 
-Current focus:
-
-- Entity and DTO model design
-- SQLite and EF Core setup
-- AppDbContext configuration
-- Initial EF Core migration
-- SQLite database creation
-- Repository Pattern preparation
-- Watchlist CRUD preparation
-- Technical documentation update for database setup
+    Controller handles HTTP.
+    Service handles business logic.
+    Repository handles data access.
+    Entity represents database persistence.
+    DTO represents API contract.
 
 ---
 
@@ -57,353 +109,254 @@ Current focus:
 
 | Area | Technology |
 |---|---|
-| Backend Framework | ASP.NET Core Web API |
+| Backend framework | ASP.NET Core Web API |
 | Runtime | .NET 8 |
 | Language | C# |
-| API Testing | Swagger / OpenAPI |
-| Persistent Database | SQLite |
+| API documentation | Swagger / OpenAPI |
+| Persistent database | SQLite |
 | ORM | EF Core Code First |
 | Cache | Redis |
 | Messaging | RabbitMQ |
-| Background Processing | Background Worker |
+| Background processing | Background Worker |
 | Documentation | Markdown + XML Summary |
 | Tracking | GitHub Issues + GitHub Projects |
 
 ---
 
-## Core Architecture Decisions
+## Planned MVP Capabilities
 
-The project follows a simple learning-focused backend architecture.
+The planned MVP includes:
 
-Key decisions:
-
-- ASP.NET Core Web API will be used as the main backend project.
-- Controllers will handle HTTP request and response flow.
-- Services will contain business logic.
-- Repositories will handle database access.
-- DTOs will be used for API request and response models.
-- Entities will represent database persistence models.
-- SQLite will be used as the persistent database.
-- Redis will only be used for short-term quote caching.
-- RabbitMQ will only be used for async price refresh messaging.
-- Swagger will be used for API testing and documentation.
-- GitHub Issues and GitHub Projects will be used instead of Jira.
+- Manage financial symbol watchlist items
+- Retrieve quote data from a public finance API
+- Cache quote data in Redis
+- Log cache hit and cache miss behavior
+- Persist price snapshots in SQLite
+- Send asynchronous price refresh messages to RabbitMQ
+- Process queue messages with a Background Worker
+- Evaluate basic price alert rules
+- Create operational action items
+- Provide health check and dependency status endpoints
+- Display Swagger / OpenAPI documentation
+- Use XML Summary comments for API documentation
+- Track work with GitHub Issues and GitHub Projects
 
 ---
 
-## Implemented Endpoints
+## API Route Direction
 
-| Method | Route | Description |
+The project uses resource-based API route naming.
+
+For Watchlist CRUD, the selected route standard is:
+
+    /api/watchlist-items
+
+Reason:
+
+- The MVP manages watchlist item resources.
+- The system does not currently manage multiple watchlists.
+- The route maps clearly to the `WatchlistItem` domain concept.
+- The route is clearer than `/api/watchlist`.
+
+Planned Watchlist CRUD routes:
+
+| Operation | HTTP Method | Route |
 |---|---|---|
-| GET | `/api/health` | Returns basic API health information |
-| GET | `/api/system/info` | Returns basic application and environment information |
-
-The `GET /api/health` endpoint verifies that the API is running and reachable through Swagger.
-
-The `GET /api/system/info` endpoint returns basic system information such as application name, version, and runtime environment.
+| List watchlist items | GET | `/api/watchlist-items` |
+| Get watchlist item by symbol | GET | `/api/watchlist-items/{symbol}` |
+| Create watchlist item | POST | `/api/watchlist-items` |
+| Delete or deactivate watchlist item | DELETE | `/api/watchlist-items/{symbol}` |
 
 ---
 
-## Implemented Models
+## Data Responsibility Standards
 
-Current entity models:
-
-| Entity | Purpose |
+| Topic | Standard |
 |---|---|
-| `WatchlistItem` | Represents a financial symbol tracked by the user |
-| `PriceSnapshot` | Represents a persistent price history record for a tracked financial symbol |
-| `PriceAlert` | Represents a price alert rule defined for a tracked financial symbol |
-| `ActionItem` | Represents an operational follow-up action created after a price alert or important price event |
-
-Current DTO models:
-
-| DTO | Purpose |
-|---|---|
-| `CreateWatchlistItemRequest` | Represents the request body used to add a new financial symbol to the watchlist |
-| `WatchlistItemResponse` | Represents the response model returned for a watchlist item |
-
----
-
-## Implemented Database Setup
-
-The project is configured to use SQLite as the persistent database through Entity Framework Core.
-
-Implemented database setup:
-
-| Item | Status |
-|---|---|
-| EF Core packages added | Completed |
-| SQLite provider configured | Completed |
-| `AppDbContext` created | Completed |
-| DbSet definitions added | Completed |
-| SQLite connection string configured | Completed |
-| Initial EF Core migration created | Completed |
-| SQLite database generated locally | Completed |
-| SQLite database files excluded from Git | Completed |
-
-Current DbSet definitions:
-
-| DbSet | Entity |
-|---|---|
-| `WatchlistItems` | `WatchlistItem` |
-| `PriceSnapshots` | `PriceSnapshot` |
-| `PriceAlerts` | `PriceAlert` |
-| `ActionItems` | `ActionItem` |
-
-Local SQLite database file:
-
-    src/MarketInsight.Api/marketinsight.db
-
-The SQLite database file is ignored by Git.
-
-Migration files are committed because they describe the database schema.
+| Entity model | Database / persistence model |
+| DTO model | API request / response contract |
+| Entity exposure | Entity models should not be returned directly from API endpoints |
+| Symbol uniqueness | `NormalizedSymbol` should be unique |
+| Symbol normalization | Trim whitespace and convert to uppercase |
+| Financial values | Use `decimal` |
+| Date/time values | Use UTC and `Utc` suffix |
+| SQLite database file | Do not commit local `.db` files |
+| Migration files | Commit migration files |
 
 ---
 
 ## Documentation
 
-Project documentation is maintained under the `docs/` folder.
+Detailed technical documentation is organized under the `docs/` folder.
 
-Current documentation files:
+Main documentation entry point:
 
-- `docs/01-project-overview.md`
-- `docs/02-http-rest-lifecycle.md`
-- `docs/03-xml-summary-swagger-standard.md`
-- `docs/04-api-endpoint-draft.md`
-- `docs/05-database-entity-design.md`
-- `docs/06-ef-core-sqlite-setup.md`
-- `docs/week-1-summary.md`
+    docs/00-index.md
+
+Documentation areas:
+
+| Area | Location |
+|---|---|
+| Project overview | `docs/01-project-overview.md` |
+| Architecture standards | `docs/architecture` |
+| API contracts | `docs/api-contracts` |
+| Database design | `docs/database-design` |
+| Project tracking | `docs/project-tracking` |
+
+Important documentation files:
+
+| Document | Purpose |
+|---|---|
+| `docs/00-index.md` | Main documentation index |
+| `docs/01-project-overview.md` | High-level project overview |
+| `docs/architecture/project-naming-standard.md` | Project, repository, solution, namespace, folder, route, and documentation naming standards |
+| `docs/architecture/layer-responsibility-standard.md` | Controller, Service, Repository, Entity, and DTO responsibility standards |
+| `docs/architecture/api-route-naming-standard.md` | API route naming rules |
+| `docs/database-design/entity-relationship-model.md` | Entity relationship model |
+| `docs/database-design/entity-constraint-standards.md` | Symbol uniqueness, normalization, decimal, UTC, and persistence standards |
+| `docs/database-design/ef-core-sqlite-setup.md` | EF Core and SQLite setup notes |
+| `docs/api-contracts/xml-summary-swagger-standard.md` | XML Summary and Swagger documentation standard |
+| `docs/api-contracts/api-endpoint-draft.md` | Planned API endpoint draft |
+| `docs/project-tracking/week-1-summary.md` | Week 1 progress summary |
 
 ---
 
-## Planned Repository Structure
+## Repository Structure
 
-    MarketInsight.OperationsTracker/
-    │
-    ├── src/
-    │   └── MarketInsight.Api/
-    │       ├── Controllers/
-    │       ├── Services/
-    │       ├── Repositories/
-    │       ├── Data/
-    │       ├── Entities/
-    │       ├── DTOs/
-    │       ├── ExternalServices/
-    │       ├── Cache/
-    │       ├── Messaging/
-    │       ├── BackgroundWorkers/
-    │       ├── Observability/
-    │       ├── Middleware/
-    │       └── Program.cs
-    │
+Current documentation and source structure:
+
+    marketinsight-operations-tracker-api/
     ├── docs/
-    │   ├── business-analysis/
-    │   ├── requirements/
+    │   ├── 00-index.md
+    │   ├── 01-project-overview.md
     │   ├── architecture/
     │   ├── api-contracts/
     │   ├── database-design/
-    │   ├── redis-design/
-    │   ├── rabbitmq-design/
-    │   ├── observability/
     │   └── project-tracking/
-    │
-    ├── tests/
-    │   └── MarketInsight.Api.Tests/
-    │
-    ├── .github/
-    │   ├── ISSUE_TEMPLATE/
-    │   └── pull_request_template.md
-    │
-    ├── README.md
-    ├── CHANGELOG.md
-    ├── .gitignore
-    └── MarketInsight.OperationsTracker.sln
-
-Note:
-
-The planned repository structure represents the target structure of the project.
-
-The full folder structure will be created gradually as the project progresses. Empty folders will not be added unnecessarily.
-
-Current documentation files are kept directly under the `docs/` folder. Topic-based documentation folders will be introduced when the related project areas are implemented.
-
----
-
-## Current Repository Structure
-
-    marketinsight-operations-tracker-api/
-    │
-    ├── .github/
-    │   └── copilot-instructions.md
-    │
-    ├── docs/
-    │   ├── 01-project-overview.md
-    │   ├── 02-http-rest-lifecycle.md
-    │   ├── 03-xml-summary-swagger-standard.md
-    │   ├── 04-api-endpoint-draft.md
-    │   ├── 05-database-entity-design.md
-    │   ├── 06-ef-core-sqlite-setup.md
-    │   └── week-1-summary.md
     │
     ├── src/
     │   └── MarketInsight.Api/
-    │       ├── Controllers/
-    │       │   ├── HealthController.cs
-    │       │   └── SystemController.cs
-    │       │
-    │       ├── Data/
-    │       │   └── AppDbContext.cs
-    │       │
-    │       ├── DTOs/
-    │       │   └── Watchlist/
-    │       │       ├── CreateWatchlistItemRequest.cs
-    │       │       └── WatchlistItemResponse.cs
-    │       │
-    │       ├── Entities/
-    │       │   ├── ActionItem.cs
-    │       │   ├── PriceAlert.cs
-    │       │   ├── PriceSnapshot.cs
-    │       │   └── WatchlistItem.cs
-    │       │
-    │       ├── Migrations/
-    │       │   ├── *_InitialCreate.cs
-    │       │   └── AppDbContextModelSnapshot.cs
-    │       │
-    │       ├── Properties/
-    │       ├── appsettings.Development.json
-    │       ├── appsettings.json
-    │       ├── MarketInsight.Api.csproj
-    │       ├── MarketInsight.Api.http
-    │       └── Program.cs
     │
-    ├── .gitignore
+    ├── MarketInsight.OperationsTracker.sln
     ├── README.md
-    └── MarketInsight.OperationsTracker.sln
-
-Note:
-
-The local SQLite database file is generated under the API project folder but is not included in Git:
-
-    src/MarketInsight.Api/marketinsight.db
-
-SQLite database files are ignored through `.gitignore`.
+    └── .gitignore
 
 ---
 
-## Week 1 Goals
+## Naming Standard
 
-By the end of Week 1, the project should include:
+The project uses the following naming baseline:
 
-- A clean GitHub repository
-- A configured GitHub Project Board
-- A working ASP.NET Core Web API project
-- Swagger/OpenAPI enabled
-- Initial XML Summary setup
-- Basic API endpoints:
-  - `GET /api/health`
-  - `GET /api/system/info`
-- Initial technical documentation
+| Naming Area | Standard Name |
+|---|---|
+| Domain / Learning Project Name | `MarketInsight Operations Tracker` |
+| Repository Display Name | `MarketInsight Operations Tracker API` |
+| Repository Name | `marketinsight-operations-tracker-api` |
+| Solution Name | `MarketInsight.OperationsTracker` |
+| API Project Name | `MarketInsight.Api` |
+| Root Namespace | `MarketInsight.Api` |
 
-Current Week 1 progress:
+Repository name uses lowercase kebab-case.
 
-- GitHub repository and project board are configured.
-- ASP.NET Core Web API project is created.
-- Swagger/OpenAPI is enabled.
-- `GET /api/health` endpoint is implemented and verified.
-- Initial project documentation is started.
-- XML documentation output is enabled.
-- Swagger is configured to read XML comments.
-- `GET /api/health` now includes XML Summary documentation.
-- `GET /api/system/info` endpoint is implemented and verified.
-- `SystemController` is created.
-- Initial controller endpoint documentation is added.
-- Week 1 endpoints are reviewed and verified through Swagger.
-- Week 1 summary documentation is added.
+C# project, namespace, class, method, and property names use PascalCase.
+
+API route segments and documentation file names use lowercase kebab-case.
 
 ---
 
-## Week 2 Goals
+## How to Run Locally
 
-By the end of Week 2, the project should include:
+Clone the repository:
 
-- Initial entity models
-- Initial DTO models
-- SQLite and EF Core setup
-- DbContext configuration
-- Initial EF Core migration
-- Repository Pattern implementation
-- Watchlist CRUD endpoints:
-  - `GET /api/watchlist`
-  - `GET /api/watchlist/{symbol}`
-  - `POST /api/watchlist`
-  - `DELETE /api/watchlist/{symbol}`
-- Database and entity design documentation
+    git clone https://github.com/yagmurcorum/marketinsight-operations-tracker-api.git
 
-Current Week 2 progress:
+Go to the repository folder:
 
-- `Entities` folder is created.
-- `DTOs/Watchlist` folder is created.
-- `WatchlistItem` entity is created.
-- `PriceSnapshot` entity is created.
-- `PriceAlert` entity is created.
-- `ActionItem` entity is created.
-- `CreateWatchlistItemRequest` DTO is created.
-- `WatchlistItemResponse` DTO is created.
-- Entity and DTO separation is documented.
-- Initial entity relationships are documented.
-- `docs/05-database-entity-design.md` is created.
-- EF Core packages are added.
-- `Data` folder is created.
-- `AppDbContext` is created.
-- DbSet definitions are added.
-- SQLite connection string is configured.
-- `AppDbContext` is registered in `Program.cs`.
-- `InitialCreate` migration is created.
-- SQLite database is created locally.
-- SQLite database files are excluded from Git tracking.
-- `docs/06-ef-core-sqlite-setup.md` is created.
-- Project build is verified successfully after configuring SQLite and EF Core.
+    cd marketinsight-operations-tracker-api
+
+Restore dependencies:
+
+    dotnet restore
+
+Build the solution:
+
+    dotnet build
+
+Run the API project:
+
+    dotnet run --project src/MarketInsight.Api/MarketInsight.Api.csproj
+
+Open Swagger in the browser using the local URL shown in the terminal.
 
 ---
 
-## Initial Setup Notes
+## Database Setup
 
-The ASP.NET Core Web API project was created with the following setup decisions:
+The project uses SQLite with EF Core Code First.
 
-- Framework: `.NET 8`
-- Authentication: `None`
-- HTTPS: `Enabled`
-- Container support: `Disabled`
-- OpenAPI / Swagger support: `Enabled`
-- Controllers: `Enabled`
-- .NET Aspire: `Disabled`
+Local SQLite database files should not be committed to Git.
 
-These decisions support the learning goal of building a controller-based Web API that can be tested through Swagger.
+Ignored database files:
 
-Docker-related setup will be introduced later for Redis and RabbitMQ using Docker Compose.
+    *.db
+    *.db-shm
+    *.db-wal
 
----
+Migration files should be committed because they represent database schema history.
 
-## Work Tracking
+To apply migrations locally:
 
-This project uses GitHub Issues and GitHub Projects for tracking.
-
-Main board:
-
-    MarketInsight Operations Tracker API Board
-
-Board workflow:
-
-    Backlog → Ready → In Progress → Review → Testing → Done
-
-Blocked work is tracked separately using the `Blocked` status.
+    dotnet ef database update --project src/MarketInsight.Api/MarketInsight.Api.csproj
 
 ---
 
-## Development Principle
+## Development Principles
 
-The project follows this principle:
+The project follows these principles:
 
-    First build a simple working structure, then improve it gradually.
+- Build simple working features first.
+- Keep responsibilities separated.
+- Use DTOs for API contracts.
+- Do not return Entity models directly from API endpoints.
+- Keep business rules in the Service layer.
+- Keep database access in the Repository layer.
+- Keep persistent data in SQLite.
+- Use Redis only for short-term quote cache.
+- Use RabbitMQ only for asynchronous processing.
+- Use Swagger for endpoint testing.
+- Use XML Summary for API documentation.
+- Use GitHub Issues and GitHub Projects for tracking.
+- Keep README as the repository entry point.
+- Keep detailed technical decisions under `docs/`.
 
-The focus is on understanding backend development concepts step by step without adding unnecessary complexity too early.
+---
+
+## Out of Scope
+
+The current MVP does not include:
+
+- User authentication
+- User-specific watchlists
+- Multiple portfolios
+- Trading operations
+- Financial advice
+- Real-time streaming market data
+- Complex investment analytics
+- Frontend application
+- Mobile application
+- Multi-tenant production architecture
+- Production-grade security hardening
+
+---
+
+## Summary
+
+MarketInsight Operations Tracker API is a learning-focused backend API project.
+
+It exists to practice professional backend development concepts through a small financial tracking domain.
+
+The repository contains only the backend API component.
+
+The project uses a learning-focused layered monolith architecture and separates responsibilities across Controller, Service, Repository, Entity, and DTO layers.
+
+Detailed technical decisions are documented under the `docs/` folder.

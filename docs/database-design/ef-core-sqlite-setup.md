@@ -14,6 +14,7 @@ This document covers:
     SQLite connection string
     Program.cs database registration
     InitialCreate migration
+    AddWatchlistItemConstraints migration
     SQLite database creation
     Git ignore rules for local database files
 
@@ -54,6 +55,9 @@ The following setup was completed:
 | `InitialCreate` migration created | Completed |
 | SQLite database file created | Completed |
 | SQLite database files added to `.gitignore` | Completed |
+| Entity constraints configured in `AppDbContext` | Completed |
+| `NormalizedSymbol` unique index configured | Completed |
+| `AddWatchlistItemConstraints` migration created | Completed |
 | Project build verified | Completed |
 
 ---
@@ -127,6 +131,139 @@ Their business logic, evaluation flow, and endpoint implementation are outside t
 
 ---
 
+## Entity Configuration
+
+Entity constraints, indexes, and relationships are configured in:
+
+    src/MarketInsight.Api/Data/AppDbContext.cs
+
+The project uses `OnModelCreating` to define database-level rules.
+
+This keeps important persistence rules explicit and versioned through EF Core migrations.
+
+Configured areas include:
+
+- Primary keys
+- Required fields
+- Maximum string lengths
+- Entity relationships
+- Foreign keys
+- Delete behavior
+- Unique index for `NormalizedSymbol`
+
+---
+
+## WatchlistItem Configuration
+
+`WatchlistItem` stores financial symbols tracked by the system.
+
+Configured standards:
+
+| Field | Configuration |
+|---|---|
+| `Id` | Primary key |
+| `Symbol` | Required, maximum length 20 |
+| `NormalizedSymbol` | Required, maximum length 20, unique index |
+| `DisplayName` | Maximum length 100 |
+| `Market` | Maximum length 50 |
+
+The most important database constraint for `WatchlistItem` is:
+
+    NormalizedSymbol must be unique.
+
+This supports the rule that the same financial symbol should not be added to the watchlist more than once.
+
+Example:
+
+    aapl
+    AAPL
+    " AAPL "
+
+All should be normalized and treated as:
+
+    AAPL
+
+---
+
+## PriceSnapshot Configuration
+
+`PriceSnapshot` stores historical price records for tracked financial symbols.
+
+Configured standards:
+
+| Field | Configuration |
+|---|---|
+| `Id` | Primary key |
+| `WatchlistItemId` | Required foreign key |
+| `Symbol` | Required, maximum length 20 |
+| `Price` | Required decimal value |
+| `Currency` | Required, maximum length 10 |
+| `Source` | Required, maximum length 50 |
+
+Relationship:
+
+    WatchlistItem 1 - N PriceSnapshot
+
+Delete behavior:
+
+    Cascade delete from WatchlistItem to related PriceSnapshot records.
+
+---
+
+## PriceAlert Configuration
+
+`PriceAlert` stores price alert rules for tracked financial symbols.
+
+Configured standards:
+
+| Field | Configuration |
+|---|---|
+| `Id` | Primary key |
+| `WatchlistItemId` | Required foreign key |
+| `Symbol` | Required, maximum length 20 |
+| `ConditionType` | Required, maximum length 20 |
+| `TargetPrice` | Required decimal value |
+
+Relationship:
+
+    WatchlistItem 1 - N PriceAlert
+
+Delete behavior:
+
+    Cascade delete from WatchlistItem to related PriceAlert records.
+
+---
+
+## ActionItem Configuration
+
+`ActionItem` stores operational follow-up actions.
+
+Configured standards:
+
+| Field | Configuration |
+|---|---|
+| `Id` | Primary key |
+| `WatchlistItemId` | Required foreign key |
+| `PriceAlertId` | Optional foreign key |
+| `Symbol` | Required, maximum length 20 |
+| `Title` | Required, maximum length 150 |
+| `Description` | Optional, maximum length 500 |
+| `Status` | Required, maximum length 30 |
+
+Relationships:
+
+    WatchlistItem 1 - N ActionItem
+    PriceAlert 1 - N ActionItem
+
+`PriceAlertId` is optional because an `ActionItem` may come from a price alert or from another important price event in the future.
+
+Delete behavior:
+
+    Cascade delete from WatchlistItem to related ActionItem records.
+    Set PriceAlertId to null if the related PriceAlert is deleted.
+
+---
+
 ## SQLite Connection String
 
 The SQLite connection string was added to:
@@ -149,7 +286,7 @@ This configuration tells EF Core to use a local SQLite database file named:
 
     marketinsight.db
 
-The database file is generated when the migration is applied.
+The database file is generated when migrations are applied.
 
 ---
 
@@ -190,17 +327,48 @@ Generated migration files include:
 | File | Purpose |
 |---|---|
 | `*_InitialCreate.cs` | Contains the database schema operations for the initial migration |
+| `*_InitialCreate.Designer.cs` | Contains EF Core generated migration metadata |
 | `AppDbContextModelSnapshot.cs` | Stores the current EF Core model snapshot |
 
 Migration files should be committed to Git because they describe the database schema.
 
-The migration prepares the initial database structure for the current entity model foundation.
+The `InitialCreate` migration prepares the initial database structure for the entity model foundation.
+
+---
+
+## Constraint Migration
+
+After documenting the entity constraint standards, an additional migration was created to align the database model with the documented standards.
+
+Migration name:
+
+    AddWatchlistItemConstraints
+
+Migration location:
+
+    src/MarketInsight.Api/Migrations
+
+This migration adds the unique index for:
+
+    WatchlistItem.NormalizedSymbol
+
+Expected index name:
+
+    IX_WatchlistItems_NormalizedSymbol
+
+Purpose:
+
+    Prevent duplicate normalized financial symbols in the watchlist.
+
+This supports the documented rule:
+
+    NormalizedSymbol should be unique.
 
 ---
 
 ## Database Update
 
-The migration was applied to the SQLite database.
+The migrations were applied to the SQLite database.
 
 Command used:
 
@@ -243,7 +411,7 @@ Correct Git behavior:
 
 ## Current Database Tables
 
-The initial migration prepares the database structure for the current entity model foundation.
+The migrations prepare the database structure for the current entity model foundation.
 
 Expected application tables:
 
@@ -262,6 +430,33 @@ EF Core also creates an internal migration history table:
 
 ---
 
+## Current Database Constraints
+
+Detailed entity constraint decisions are documented in:
+
+    docs/database-design/entity-constraint-standards.md
+
+This section only describes the constraints currently configured through EF Core.
+
+The current database model includes the following important constraints:
+
+| Area | Constraint |
+|---|---|
+| `WatchlistItem.Symbol` | Required, maximum length 20 |
+| `WatchlistItem.NormalizedSymbol` | Required, maximum length 20, unique index |
+| `PriceSnapshot.Symbol` | Required, maximum length 20 |
+| `PriceSnapshot.Price` | Required decimal value |
+| `PriceSnapshot.Currency` | Required, maximum length 10 |
+| `PriceSnapshot.Source` | Required, maximum length 50 |
+| `PriceAlert.Symbol` | Required, maximum length 20 |
+| `PriceAlert.ConditionType` | Required, maximum length 20 |
+| `PriceAlert.TargetPrice` | Required decimal value |
+| `ActionItem.Symbol` | Required, maximum length 20 |
+| `ActionItem.Title` | Required, maximum length 150 |
+| `ActionItem.Status` | Required, maximum length 30 |
+
+---
+
 ## Current Scope
 
 This document covers the SQLite and EF Core setup completed for the database foundation.
@@ -275,6 +470,9 @@ The following items are included in the current scope:
 - SQLite connection string configuration
 - Dependency injection registration for `AppDbContext`
 - Initial EF Core migration
+- Entity constraint configuration
+- `NormalizedSymbol` unique index configuration
+- Constraint migration
 - SQLite database creation
 - `.gitignore` update for local SQLite database files
 - Build verification
@@ -290,7 +488,8 @@ The following topics are outside the scope of this document and will be document
 - Controller-to-service flow
 - Service layer implementation
 - Watchlist validation logic
-- Duplicate symbol control
+- Duplicate symbol control at service level
+- Symbol normalization implementation at service level
 - Price refresh endpoint
 - PriceSnapshot creation during refresh
 - External Finance API integration
@@ -317,7 +516,7 @@ Result:
     Entity Framework Core .NET Command-line Tools
     8.0.27
 
-### Migration Verification
+### Initial Migration Verification
 
 The `InitialCreate` migration was created successfully.
 
@@ -325,9 +524,21 @@ Migration folder:
 
     src/MarketInsight.Api/Migrations
 
+### Constraint Migration Verification
+
+The `AddWatchlistItemConstraints` migration was created successfully.
+
+The migration adds a unique index for:
+
+    NormalizedSymbol
+
+Expected index:
+
+    IX_WatchlistItems_NormalizedSymbol
+
 ### Database Verification
 
-The migration was applied successfully.
+The migrations were applied successfully.
 
 The SQLite database file was created:
 
@@ -335,7 +546,7 @@ The SQLite database file was created:
 
 ### Build Verification
 
-After configuring EF Core, SQLite, migration, and database update, the project build was executed.
+After configuring EF Core, SQLite, migrations, database update, and entity constraints, the project build was executed.
 
 Build command:
 
@@ -351,14 +562,16 @@ Result:
 
 | File | Purpose |
 |---|---|
-| `src/MarketInsight.Api/Data/AppDbContext.cs` | EF Core database context |
+| `src/MarketInsight.Api/Data/AppDbContext.cs` | EF Core database context and entity configuration |
 | `src/MarketInsight.Api/appsettings.json` | SQLite connection string configuration |
 | `src/MarketInsight.Api/Program.cs` | AppDbContext dependency injection registration |
 | `src/MarketInsight.Api/MarketInsight.Api.csproj` | EF Core package references |
 | `src/MarketInsight.Api/Migrations/*_InitialCreate.cs` | Initial EF Core migration |
+| `src/MarketInsight.Api/Migrations/*_AddWatchlistItemConstraints.cs` | EF Core migration for entity constraints and unique index |
 | `src/MarketInsight.Api/Migrations/AppDbContextModelSnapshot.cs` | EF Core model snapshot |
 | `.gitignore` | Ignores local SQLite database files |
-| `docs/06-ef-core-sqlite-setup.md` | Documents the EF Core and SQLite setup |
+| `docs/database-design/ef-core-sqlite-setup.md` | Documents the EF Core and SQLite setup |
+| `docs/database-design/entity-constraint-standards.md` | Documents detailed entity constraint decisions |
 
 ---
 
@@ -369,6 +582,8 @@ SQLite is configured as the persistent database for the project.
 Entity Framework Core is connected to SQLite through `AppDbContext`.
 
 The initial migration was created and applied successfully.
+
+The entity constraint migration was created and applied successfully.
 
 The local SQLite database file was generated and excluded from Git tracking.
 
