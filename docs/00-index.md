@@ -18,11 +18,13 @@ The project documentation is organized by topic.
     │   ├── project-naming-standard.md
     │   ├── http-rest-lifecycle.md
     │   ├── layer-responsibility-standard.md
-    │   └── api-route-naming-standard.md
+    │   ├── api-route-naming-standard.md
+    │   └── repository-pattern-and-linq.md
     │
     ├── api-contracts/
     │   ├── xml-summary-swagger-standard.md
-    │   └── api-endpoint-draft.md
+    │   ├── api-endpoint-draft.md
+    │   └── watchlist-items-api-contract.md
     │
     ├── database-design/
     │   ├── entity-design.md
@@ -31,7 +33,8 @@ The project documentation is organized by topic.
     │   └── entity-constraint-standards.md
     │
     └── project-tracking/
-        └── week-1-summary.md
+        ├── week-1-summary.md
+        └── week-2-database-summary.md
 
 ---
 
@@ -51,6 +54,7 @@ The project documentation is organized by topic.
 | `docs/architecture/http-rest-lifecycle.md` | Explains the HTTP/REST request-response lifecycle and how it relates to the API |
 | `docs/architecture/layer-responsibility-standard.md` | Defines the responsibilities of Controller, Service, Repository, Entity, and DTO layers |
 | `docs/architecture/api-route-naming-standard.md` | Defines API route naming rules before Watchlist CRUD implementation |
+| `docs/architecture/repository-pattern-and-linq.md` | Explains Repository Pattern, LINQ usage, async EF Core queries, and data access separation |
 
 ---
 
@@ -60,6 +64,7 @@ The project documentation is organized by topic.
 |---|---|
 | `docs/api-contracts/xml-summary-swagger-standard.md` | Defines XML Summary and Swagger documentation standards |
 | `docs/api-contracts/api-endpoint-draft.md` | Lists planned API endpoints and API contract decisions |
+| `docs/api-contracts/watchlist-items-api-contract.md` | Defines Watchlist Items CRUD endpoints, request and response models, status codes, validation behavior, and Swagger test flow |
 
 ---
 
@@ -79,6 +84,7 @@ The project documentation is organized by topic.
 | Document | Purpose |
 |---|---|
 | `docs/project-tracking/week-1-summary.md` | Summarizes Week 1 implementation progress and verification results |
+| `docs/project-tracking/week-2-database-summary.md` | Summarizes database setup, Repository Pattern, Watchlist Items CRUD implementation, Swagger demo flow, and Week 2 verification results |
 
 ---
 
