@@ -14,6 +14,10 @@ This supports the learning-focused layered monolith architecture used in the pro
 
 Repository Pattern helps keep the codebase easier to understand, test, maintain, and extend.
 
+The repository layer is responsible for accessing persistent data through EF Core and SQLite.
+
+It does not decide business behavior such as duplicate handling, soft delete behavior, or reactivation behavior.
+
 ---
 
 ## Why Repository Pattern Is Used
@@ -27,6 +31,10 @@ That would make Controllers responsible for too many things.
 A Controller should not know how the database is queried.
 
 A Controller should only handle HTTP request and response flow.
+
+The Service should own business decisions.
+
+The Repository should only know how to access and persist data.
 
 ---
 
@@ -62,6 +70,7 @@ In this project, the repository:
 - Uses async database methods
 - Reads data from the database
 - Adds data to the database context
+- Provides tracked entities when updates are needed
 - Saves database changes
 
 ---
@@ -73,9 +82,11 @@ Repository should not contain business logic.
 Repository should not:
 
 - Decide HTTP status codes
-- Return `Ok`, `NotFound`, `Conflict`, or `BadRequest`
+- Return `Ok`, `Created`, `NotFound`, `Conflict`, or `BadRequest`
 - Normalize symbols as a business rule
 - Decide duplicate symbol behavior
+- Decide whether an inactive record should be reactivated
+- Decide whether soft delete should be used from a business perspective
 - Map Entity models to DTOs for API responses
 - Handle Swagger behavior
 - Handle request validation messages
@@ -203,7 +214,7 @@ The repository implementation includes the following methods:
 | Method | Purpose |
 |---|---|
 | `GetAllActiveAsync` | Gets all active watchlist items |
-| `GetByNormalizedSymbolAsync` | Gets one item by normalized symbol |
+| `GetByNormalizedSymbolAsync` | Gets one item by normalized symbol, including inactive records |
 | `ExistsByNormalizedSymbolAsync` | Checks whether a symbol already exists |
 | `AddAsync` | Adds a new watchlist item to the database context |
 | `SaveChangesAsync` | Saves pending database changes |
@@ -239,6 +250,16 @@ Decide HTTP 200 OK response.
 Map Entity to DTO.
 ```
 
+Example:
+
+```csharp
+return await _context.WatchlistItems
+    .AsNoTracking()
+    .Where(item => item.IsActive)
+    .OrderBy(item => item.Symbol)
+    .ToListAsync();
+```
+
 ---
 
 ## GetByNormalizedSymbolAsync
@@ -255,6 +276,7 @@ Expected behavior:
 - Returns the matching item if found
 - Returns null if not found
 - Uses `FirstOrDefaultAsync`
+- May return active or inactive records
 
 Important note:
 
@@ -262,9 +284,29 @@ This method does not filter only active records.
 
 Reason:
 
-The project uses a unique constraint on `NormalizedSymbol`.
+The project uses soft delete and reactivation behavior.
 
-Future soft delete or reactivation behavior may need to find inactive records too.
+The Service needs to know whether the existing record is:
+
+```text
+Not found
+Active
+Inactive
+```
+
+because each state produces a different business result:
+
+| Existing Record State | Service Decision |
+|---|---|
+| No existing record | Create new WatchlistItem |
+| Existing active record | Return duplicate result |
+| Existing inactive record | Reactivate existing WatchlistItem |
+
+For create, delete, and reactivation flows, this method should return a tracked entity when updates are needed.
+
+The Repository only retrieves the data.
+
+The Service decides what the data means.
 
 ---
 
@@ -283,9 +325,28 @@ Expected behavior:
 - Returns `false` if it does not exist
 - Uses `AnyAsync`
 
-This method helps the Service layer apply duplicate symbol rules.
+This method can be useful when the application only needs a simple yes/no existence check.
 
-The Repository only checks existence.
+However, for the current WatchlistItem create flow, `ExistsByNormalizedSymbolAsync` is not enough by itself.
+
+Reason:
+
+The create flow must know whether the existing record is active or inactive.
+
+Current create flow should use:
+
+```text
+GetByNormalizedSymbolAsync
+```
+
+because the Service needs the existing entity state:
+
+```text
+IsActive = true  → duplicate conflict
+IsActive = false → reactivation
+```
+
+The Repository only checks or retrieves data.
 
 The Service decides what to do with that result.
 
@@ -307,6 +368,16 @@ It only tracks the new entity in the EF Core change tracker.
 
 The actual database write happens when `SaveChangesAsync` is called.
 
+This method is used when no existing `WatchlistItem` exists for the requested `NormalizedSymbol`.
+
+It should not be used when an inactive existing item is being reactivated.
+
+Reactivation should update the existing tracked entity and then call:
+
+```text
+SaveChangesAsync
+```
+
 ---
 
 ## SaveChangesAsync
@@ -321,6 +392,13 @@ Expected behavior:
 
 - Calls `AppDbContext.SaveChangesAsync`
 - Writes tracked changes to the SQLite database
+
+This method is used after:
+
+- Creating a new WatchlistItem
+- Soft deleting an active WatchlistItem
+- Reactivating an inactive WatchlistItem
+- Future update operations
 
 ---
 
@@ -359,6 +437,7 @@ Return the result as a list asynchronously.
 | `FirstOrDefaultAsync` | Gets the first matching record or null |
 | `AnyAsync` | Checks whether any matching record exists |
 | `ToListAsync` | Converts query result to a list |
+| `AsNoTracking` | Reads records without EF Core change tracking |
 
 ---
 
@@ -376,6 +455,18 @@ This means:
 
 ```text
 Only return records where IsActive is true.
+```
+
+Another example:
+
+```csharp
+Where(item => item.NormalizedSymbol == normalizedSymbol)
+```
+
+This means:
+
+```text
+Only return records matching the normalized symbol.
 ```
 
 ---
@@ -415,7 +506,9 @@ Possible results:
 | Matching record exists | Returns the entity |
 | Matching record does not exist | Returns null |
 
-This is useful for detail endpoints and delete flows.
+This is useful for detail, delete, create, and reactivation flows.
+
+Because `NormalizedSymbol` is unique, the query should return at most one matching record.
 
 ---
 
@@ -436,7 +529,9 @@ Possible results:
 | Matching record exists | `true` |
 | Matching record does not exist | `false` |
 
-This is useful for duplicate checks.
+This is useful for simple existence checks.
+
+However, when the business rule depends on record state, such as active versus inactive, `FirstOrDefaultAsync` through `GetByNormalizedSymbolAsync` is more useful.
 
 ---
 
@@ -470,6 +565,23 @@ Reason:
 If the application only reads data and does not update the returned entities, EF Core does not need to track them.
 
 This can make read operations lighter.
+
+In this project:
+
+| Query Type | Tracking Behavior |
+|---|---|
+| List active items | Can use `AsNoTracking` |
+| Get detail for read-only response | Can use `AsNoTracking` if no update is needed |
+| Get item for delete | Should return a tracked entity |
+| Get item for reactivation | Should return a tracked entity |
+| Get item for update | Should return a tracked entity |
+
+Important rule:
+
+```text
+Use AsNoTracking for read-only queries.
+Do not use AsNoTracking when the returned entity will be modified and saved.
+```
 
 ---
 
@@ -544,13 +656,19 @@ AppDbContext
 SQLite
 ```
 
-The Service layer will use the Repository to implement use cases such as:
+The Service layer uses the Repository to implement use cases such as:
 
-- List watchlist items
+- List active watchlist items
 - Get watchlist item detail
 - Add a new symbol
-- Check duplicate symbol
+- Check whether a symbol exists
+- Detect active duplicate symbols
+- Reactivate inactive symbols
 - Soft delete a symbol
+
+The Repository retrieves or persists data.
+
+The Service decides business meaning and business outcome.
 
 ---
 
@@ -563,13 +681,17 @@ Example:
 Repository can answer:
 
 ```text
-Does AAPL exist?
+AAPL exists.
+AAPL IsActive is true.
+AAPL IsActive is false.
 ```
 
 Service decides:
 
 ```text
-If AAPL exists, return duplicate conflict result.
+If AAPL does not exist, create it.
+If AAPL exists and is active, return duplicate conflict result.
+If AAPL exists and is inactive, reactivate it.
 ```
 
 This keeps the project architecture clean.
@@ -613,6 +735,20 @@ Repository should not return:
 
 These are Controller-level response concerns.
 
+The Service can return application-level results.
+
+The Controller maps those results to HTTP status codes.
+
+Example:
+
+| Service Result | Controller Response |
+|---|---|
+| Created | `201 Created` |
+| Reactivated | `200 OK` |
+| Duplicate | `409 Conflict` |
+| Deleted | `204 No Content` |
+| Not found | `404 Not Found` |
+
 ---
 
 ## Implementation Outcome
@@ -625,6 +761,7 @@ After this implementation:
 - Repository methods were implemented with async EF Core queries.
 - LINQ was used for filtering, ordering, lookup, and existence checks.
 - Repository was registered in dependency injection.
+- Service layer uses Repository for create, read, delete, and reactivation flows.
 - Project build completed successfully.
 
 ---
@@ -641,6 +778,10 @@ After this implementation:
 8. What does `ToListAsync` do?
 9. Why do we use async database methods?
 10. Why should Repository not return DTOs?
+11. Why is `ExistsByNormalizedSymbolAsync` not enough for the current create flow?
+12. Why does reactivation need the existing entity instead of only a boolean result?
+13. When should `AsNoTracking` be used?
+14. When should `AsNoTracking` not be used?
 
 ---
 
@@ -656,4 +797,14 @@ In this project:
 - Entity represents database structure.
 - DTO represents API contract.
 
-This repository implementation prepares the project for Watchlist Items CRUD development.
+Current WatchlistItem create behavior:
+
+```text
+No existing symbol       → create new record
+Existing active symbol   → duplicate conflict
+Existing inactive symbol → reactivate existing record
+```
+
+The Repository provides the data needed for these decisions, but the Service owns the decisions.
+
+This repository implementation supports Watchlist Items CRUD, soft delete, and inactive record reactivation behavior.

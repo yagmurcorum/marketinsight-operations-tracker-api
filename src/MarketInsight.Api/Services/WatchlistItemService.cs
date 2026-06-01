@@ -50,11 +50,25 @@ public class WatchlistItemService : IWatchlistItemService
     {
         var normalizedSymbol = NormalizeSymbol(request.Symbol);
 
-        var exists = await _watchlistItemRepository.ExistsByNormalizedSymbolAsync(normalizedSymbol);
+        var existingItem = await _watchlistItemRepository.GetByNormalizedSymbolAsync(normalizedSymbol);
 
-        if (exists)
+        if (existingItem is not null && existingItem.IsActive)
         {
             return CreateWatchlistItemResult.Duplicate(normalizedSymbol);
+        }
+
+        if (existingItem is not null && !existingItem.IsActive)
+        {
+            existingItem.Symbol = normalizedSymbol;
+            existingItem.NormalizedSymbol = normalizedSymbol;
+            existingItem.DisplayName = NormalizeOptionalText(request.DisplayName);
+            existingItem.Market = NormalizeOptionalText(request.Market);
+            existingItem.IsActive = true;
+            existingItem.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _watchlistItemRepository.SaveChangesAsync();
+
+            return CreateWatchlistItemResult.Reactivated(MapToResponse(existingItem));
         }
 
         var watchlistItem = new WatchlistItem
@@ -114,6 +128,7 @@ public class WatchlistItemService : IWatchlistItemService
         {
             Id = item.Id,
             Symbol = item.Symbol,
+            NormalizedSymbol = item.NormalizedSymbol,
             DisplayName = item.DisplayName,
             Market = item.Market,
             IsActive = item.IsActive,

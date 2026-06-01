@@ -2,7 +2,7 @@
 
 This document defines the responsibility boundaries between the main application layers of the MarketInsight Operations Tracker API.
 
-The purpose of this standard is to keep the project understandable, maintainable, and consistent before implementing Repository Pattern, LINQ queries, and Watchlist CRUD endpoints.
+The purpose of this standard is to keep the project understandable, maintainable, and consistent while implementing and maintaining Repository Pattern, LINQ queries, Watchlist CRUD endpoints, soft delete behavior, and reactivation behavior.
 
 ---
 
@@ -38,6 +38,8 @@ For example:
 - Entity may be returned directly from the API.
 - DTO and Entity may become mixed.
 - Validation and database access may become scattered.
+- Soft delete behavior may become inconsistent.
+- Reactivation behavior may be implemented in the wrong layer.
 
 This project avoids that by defining clear boundaries.
 
@@ -97,11 +99,11 @@ It receives requests from the client, calls the required application logic, and 
 
 In this project, controllers are responsible for API endpoint behavior.
 
-Example future controller:
+Current controller example:
 
     WatchlistItemsController
 
-Example future routes:
+Current routes:
 
     GET /api/watchlist-items
     GET /api/watchlist-items/{symbol}
@@ -123,6 +125,18 @@ Controllers should:
 - Keep endpoint behavior readable.
 - Use XML Summary comments for Swagger documentation.
 
+For Watchlist Items, the Controller maps Service results to HTTP responses.
+
+Example:
+
+| Service Result | HTTP Response |
+|---|---|
+| Created | `201 Created` |
+| Reactivated | `200 OK` |
+| Duplicate | `409 Conflict` |
+| Not found | `404 Not Found` |
+| Deleted | `204 No Content` |
+
 ---
 
 ### Controller Should Not
@@ -134,6 +148,7 @@ Controllers should not:
 - Directly write EF Core queries.
 - Decide database persistence rules.
 - Perform duplicate symbol checks by itself.
+- Decide whether inactive records should be reactivated.
 - Perform complex validation rules by itself.
 - Return Entity models directly.
 - Contain long procedural workflows.
@@ -160,11 +175,12 @@ The Service layer handles use cases and business rules.
 
 It coordinates the application behavior between Controller and Repository.
 
-In this project, services will be responsible for business decisions such as:
+In this project, services are responsible for business decisions such as:
 
 - Symbol normalization
-- Duplicate symbol validation
+- Active duplicate symbol validation
 - Watchlist item creation logic
+- Inactive watchlist item reactivation
 - Soft delete behavior
 - Mapping between Entity and DTO
 - Future alert evaluation flow
@@ -182,9 +198,17 @@ Services should:
 - Normalize input values.
 - Validate business conditions.
 - Decide what should happen when data exists or does not exist.
+- Decide what should happen when existing data is active or inactive.
 - Map request DTOs to Entity models.
 - Map Entity models to response DTOs.
 - Return application-level results to controllers.
+
+For Watchlist Items, the Service owns these business rules:
+
+    New symbol → create new record
+    Existing active symbol → return duplicate result
+    Existing inactive symbol → reactivate existing record
+    Delete active symbol → set IsActive to false
 
 ---
 
@@ -198,26 +222,37 @@ Services should not:
 - Depend on Swagger or HTTP-specific metadata.
 - Be responsible for database schema configuration.
 - Be responsible for EF Core migration logic.
+- Return HTTP-specific response objects such as `Ok`, `Created`, or `Conflict`.
 
 ---
 
 ### Service Example Responsibility
 
-Example future create flow:
+Example Watchlist create flow:
 
     CreateWatchlistItemRequest DTO
           ↓
-    Validate symbol
+    Validate basic input through model validation
           ↓
     Normalize symbol
           ↓
-    Check duplicate with Repository
+    Ask Repository for existing record by NormalizedSymbol
           ↓
-    Create WatchlistItem Entity
+    If no existing record:
+          Create WatchlistItem Entity
+          Save with Repository
+          Return Created result
           ↓
-    Save with Repository
+    If existing record is active:
+          Return Duplicate result
           ↓
-    Return WatchlistItemResponse DTO
+    If existing record is inactive:
+          Reactivate existing WatchlistItem Entity
+          Update UpdatedAtUtc
+          Save with Repository
+          Return Reactivated result
+          ↓
+    Controller maps result to HTTP response
 
 Correct service mindset:
 
@@ -237,12 +272,12 @@ The Repository layer handles database access.
 
 It isolates EF Core and data access logic from the rest of the application.
 
-In this project, repositories will use `AppDbContext` and `DbSet` objects to query and persist data.
+In this project, repositories use `AppDbContext` and `DbSet` objects to query and persist data.
 
-Example future repository:
+Current repository example:
 
-    IWatchlistRepository
-    WatchlistRepository
+    IWatchlistItemRepository
+    WatchlistItemRepository
 
 ---
 
@@ -252,7 +287,7 @@ Repositories should:
 
 - Read data from the database.
 - Add new records to the database.
-- Update existing records.
+- Update existing tracked records through EF Core change tracking.
 - Apply simple data access filters.
 - Use EF Core LINQ queries.
 - Use async database operations.
@@ -272,6 +307,7 @@ Repositories should not:
 - Contain business rule decisions.
 - Decide whether an operation is allowed from a business perspective.
 - Normalize symbols as a business rule.
+- Decide whether an inactive item should be reactivated.
 - Decide API response shape.
 - Know about Swagger documentation.
 - Contain UI or client-specific logic.
@@ -280,13 +316,13 @@ Repositories should not:
 
 ### Repository Example Responsibility
 
-Possible future methods:
+Current methods:
 
     GetAllActiveAsync
-    GetBySymbolAsync
-    ExistsBySymbolAsync
+    GetByNormalizedSymbolAsync
+    ExistsByNormalizedSymbolAsync
     AddAsync
-    SoftDeleteAsync
+    SaveChangesAsync
 
 Correct repository mindset:
 
@@ -295,6 +331,15 @@ Correct repository mindset:
 Wrong repository mindset:
 
     "I decide the business meaning of the operation."
+
+Important distinction:
+
+    GetAllActiveAsync returns only active records.
+    GetByNormalizedSymbolAsync may return active or inactive records.
+
+Reason:
+
+    The Service needs to inspect whether an existing WatchlistItem is active or inactive before deciding create, conflict, or reactivation behavior.
 
 ---
 
@@ -416,7 +461,7 @@ DTOs should not:
 
 ### DTO Example
 
-`CreateWatchlistItemRequest` represents the request body for creating a watchlist item.
+`CreateWatchlistItemRequest` represents the request body for creating or reactivating a watchlist item.
 
 `WatchlistItemResponse` represents the response returned from the API.
 
@@ -479,7 +524,7 @@ Reason:
 - Response models define what the API returns.
 - The two shapes do not have to be identical.
 
-For example, when creating a watchlist item, the client may only send:
+For example, when creating or reactivating a watchlist item, the client may only send:
 
     symbol
     displayName
@@ -505,8 +550,9 @@ Business logic should be placed in the Service layer.
 Examples of business logic:
 
 - Symbol normalization
-- Duplicate symbol check decision
+- Active duplicate symbol check decision
 - Whether a watchlist item can be created
+- Whether an inactive watchlist item should be reactivated
 - Whether a watchlist item can be deleted
 - Whether soft delete should be used
 - Future alert evaluation rules
@@ -521,10 +567,10 @@ Data access should be placed in the Repository layer.
 Examples of data access:
 
 - Query all active watchlist items
-- Find watchlist item by symbol
+- Find watchlist item by normalized symbol
 - Check whether symbol already exists
 - Add new watchlist item
-- Update existing entity
+- Update existing entity through EF Core tracking
 - Save changes through EF Core
 
 ---
@@ -540,6 +586,7 @@ Examples of HTTP responsibility:
 - Status code selection
 - Returning `Ok`
 - Returning `Created`
+- Returning `Conflict`
 - Returning `NotFound`
 - Returning `BadRequest`
 - Returning `NoContent`
@@ -556,15 +603,23 @@ Examples of HTTP responsibility:
           ↓
     Service normalizes Symbol
           ↓
-    Service checks duplicate rule through Repository
+    Service asks Repository for existing record by NormalizedSymbol
           ↓
-    Service creates WatchlistItem Entity
+    Repository returns existing Entity or null
           ↓
-    Repository saves Entity through AppDbContext
+    Service decides business result:
+          - No existing record → create new WatchlistItem
+          - Existing active record → duplicate result
+          - Existing inactive record → reactivate existing WatchlistItem
+          ↓
+    Repository saves Entity changes through AppDbContext
           ↓
     Service maps Entity to WatchlistItemResponse
           ↓
-    Controller returns HTTP response
+    Controller returns HTTP response:
+          - Created result → 201 Created
+          - Reactivated result → 200 OK
+          - Duplicate result → 409 Conflict
 
 ---
 
@@ -578,11 +633,33 @@ Examples of HTTP responsibility:
           ↓
     Repository queries DbSet<WatchlistItem>
           ↓
-    Repository returns Entity list
+    Repository returns active Entity list
           ↓
     Service maps Entities to Response DTOs
           ↓
     Controller returns 200 OK
+
+---
+
+## Example Watchlist Delete Flow
+
+    Client sends DELETE /api/watchlist-items/{symbol}
+          ↓
+    Controller calls Service
+          ↓
+    Service normalizes Symbol
+          ↓
+    Service asks Repository for existing record by NormalizedSymbol
+          ↓
+    If item does not exist or is inactive:
+          Service returns false
+          Controller returns 404 Not Found
+          ↓
+    If item exists and is active:
+          Service sets IsActive = false
+          Service sets UpdatedAtUtc = DateTime.UtcNow
+          Repository saves changes
+          Controller returns 204 No Content
 
 ---
 
@@ -627,7 +704,7 @@ Entities are used by Repository and Service for persistence operations.
 | Concept | Layer | Example |
 |---|---|---|
 | API endpoint | Controller | `GET /api/watchlist-items` |
-| Use case | Service | Create watchlist item |
+| Use case | Service | Create, reactivate, delete watchlist item |
 | Data access | Repository | Query `WatchlistItems` |
 | Database model | Entity | `WatchlistItem` |
 | Request model | DTO | `CreateWatchlistItemRequest` |
@@ -648,6 +725,8 @@ This standard protects the project from:
 - Unclear responsibility boundaries
 - Difficult-to-test code
 - Hard-to-maintain CRUD implementation
+- Inconsistent soft delete behavior
+- Inconsistent reactivation behavior
 - Future refactoring cost
 
 ---
@@ -663,20 +742,25 @@ Before adding a new feature, check:
 - Are DTOs used as request/response models?
 - Are Entities avoided as direct API responses?
 - Is mapping between Entity and DTO explicit?
+- Is symbol normalization handled by the Service?
+- Is active duplicate behavior handled by the Service?
+- Is inactive reactivation behavior handled by the Service?
+- Is soft delete behavior handled by the Service?
+- Is the Repository only responsible for data access?
 - Is the code easy to explain layer by layer?
 
 ---
 
 ## Current Status
 
-This standard is created before Watchlist CRUD implementation.
-
-It will guide the implementation of:
+This standard is used to guide the implementation of:
 
 - Repository Pattern
 - LINQ queries
 - Watchlist CRUD endpoints
 - DTO mapping
+- Soft delete behavior
+- Inactive record reactivation behavior
 - Future price refresh flow
 - Future alert evaluation flow
 - Future action item workflow
@@ -695,8 +779,11 @@ Layer rules:
 - Entity represents database persistence model.
 - DTO represents API request and response contract.
 
-Core rule:
+Core rules:
 
     Do not return Entity models directly from API endpoints.
+    Do not put business logic in Controllers.
+    Do not put business decisions in Repositories.
+    Keep create, duplicate, soft delete, and reactivation decisions in the Service layer.
 
 Use DTOs for API contracts and Entities for database persistence.

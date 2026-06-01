@@ -249,8 +249,40 @@ Planned Watchlist CRUD routes:
 |---|---|---|
 | List watchlist items | GET | `/api/watchlist-items` |
 | Get watchlist item by symbol | GET | `/api/watchlist-items/{symbol}` |
-| Create watchlist item | POST | `/api/watchlist-items` |
+| Create or reactivate watchlist item | POST | `/api/watchlist-items` |
 | Delete or deactivate watchlist item | DELETE | `/api/watchlist-items/{symbol}` |
+
+---
+
+## Watchlist Item Behavior
+
+The Watchlist Items API uses `NormalizedSymbol` to decide whether a symbol should be created, rejected as an active duplicate, or reactivated.
+
+Current behavior:
+
+| Existing Record State | API Behavior | Status Code |
+|---|---|---|
+| No existing record with same `NormalizedSymbol` | Create new `WatchlistItem` | `201 Created` |
+| Existing record is active | Return duplicate conflict | `409 Conflict` |
+| Existing record is inactive | Reactivate existing `WatchlistItem` | `200 OK` |
+
+The project uses soft delete instead of hard delete.
+
+When a watchlist item is deleted:
+
+    IsActive = false
+    UpdatedAtUtc = current UTC time
+
+When the same inactive symbol is posted again:
+
+    IsActive = true
+    UpdatedAtUtc = current UTC time
+
+The existing database row is reused.
+
+No duplicate row is created for the same normalized symbol.
+
+This keeps the API behavior clear while preserving data consistency.
 
 ---
 
@@ -279,8 +311,10 @@ Planned Watchlist CRUD routes:
 | Entity model | Database / persistence model |
 | DTO model | API request / response contract |
 | Entity exposure | Entity models should not be returned directly from API endpoints |
-| Symbol uniqueness | `NormalizedSymbol` should be unique |
+| Symbol uniqueness | `NormalizedSymbol` should be unique across all records |
 | Symbol normalization | Trim whitespace and convert to uppercase |
+| Soft delete | Use `IsActive = false` instead of hard delete |
+| Reactivation | Re-posting an inactive symbol reactivates the existing row |
 | Financial values | Use `decimal` |
 | Date/time values | Use UTC and `Utc` suffix |
 | SQLite database file | Do not commit local `.db` files |
@@ -340,5 +374,7 @@ It exists to practice professional backend development concepts through a small 
 The repository contains only the backend API component.
 
 The project uses a learning-focused layered monolith architecture and separates responsibilities across Controller, Service, Repository, Entity, and DTO layers.
+
+The Watchlist Items API uses normalized symbols, soft delete, and reactivation behavior to keep data consistent while providing clear API behavior.
 
 The development approach is incremental, documented, and aligned with backend learning goals.

@@ -13,12 +13,17 @@ public class CreateWatchlistItemResult
     public bool IsCreated { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the requested symbol already exists.
+    /// Gets a value indicating whether an inactive watchlist item was reactivated.
+    /// </summary>
+    public bool IsReactivated { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the requested symbol already exists as an active item.
     /// </summary>
     public bool IsDuplicate { get; init; }
 
     /// <summary>
-    /// Gets the created watchlist item response when the operation succeeds.
+    /// Gets the watchlist item response when the operation succeeds.
     /// </summary>
     public WatchlistItemResponse? Item { get; init; }
 
@@ -37,6 +42,7 @@ public class CreateWatchlistItemResult
         return new CreateWatchlistItemResult
         {
             IsCreated = true,
+            IsReactivated = false,
             IsDuplicate = false,
             Item = item,
             Message = "Watchlist item was created successfully."
@@ -44,15 +50,33 @@ public class CreateWatchlistItemResult
     }
 
     /// <summary>
+    /// Creates a successful reactivation result.
+    /// </summary>
+    /// <param name="item">The reactivated watchlist item response.</param>
+    /// <returns>A successful reactivation result.</returns>
+    public static CreateWatchlistItemResult Reactivated(WatchlistItemResponse item)
+    {
+        return new CreateWatchlistItemResult
+        {
+            IsCreated = false,
+            IsReactivated = true,
+            IsDuplicate = false,
+            Item = item,
+            Message = "Inactive watchlist item was reactivated successfully."
+        };
+    }
+
+    /// <summary>
     /// Creates a duplicate symbol result.
     /// </summary>
-    /// <param name="normalizedSymbol">The normalized symbol that already exists.</param>
+    /// <param name="normalizedSymbol">The normalized symbol that already exists as an active item.</param>
     /// <returns>A duplicate create result.</returns>
     public static CreateWatchlistItemResult Duplicate(string normalizedSymbol)
     {
         return new CreateWatchlistItemResult
         {
             IsCreated = false,
+            IsReactivated = false,
             IsDuplicate = true,
             Item = null,
             Message = $"Watchlist item with symbol '{normalizedSymbol}' already exists."

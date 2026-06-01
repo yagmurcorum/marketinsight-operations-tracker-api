@@ -59,11 +59,12 @@ public class WatchlistItemsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new watchlist item.
+    /// Creates a new watchlist item or reactivates an inactive existing watchlist item.
     /// </summary>
     /// <param name="request">The watchlist item creation request.</param>
-    /// <returns>The created watchlist item.</returns>
+    /// <returns>The created or reactivated watchlist item.</returns>
     [HttpPost]
+    [ProducesResponseType(typeof(WatchlistItemResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(WatchlistItemResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -78,6 +79,11 @@ public class WatchlistItemsController : ControllerBase
             {
                 message = result.Message
             });
+        }
+
+        if (result.IsReactivated)
+        {
+            return Ok(result.Item);
         }
 
         return Created(

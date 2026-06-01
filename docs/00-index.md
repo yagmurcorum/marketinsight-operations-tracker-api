@@ -52,9 +52,9 @@ The project documentation is organized by topic.
 |---|---|
 | `docs/architecture/project-naming-standard.md` | Defines project, repository, solution, API project, namespace, folder, route, and documentation naming standards |
 | `docs/architecture/http-rest-lifecycle.md` | Explains the HTTP/REST request-response lifecycle and how it relates to the API |
-| `docs/architecture/layer-responsibility-standard.md` | Defines the responsibilities of Controller, Service, Repository, Entity, and DTO layers |
-| `docs/architecture/api-route-naming-standard.md` | Defines API route naming rules before Watchlist CRUD implementation |
-| `docs/architecture/repository-pattern-and-linq.md` | Explains Repository Pattern, LINQ usage, async EF Core queries, and data access separation |
+| `docs/architecture/layer-responsibility-standard.md` | Defines the responsibilities of Controller, Service, Repository, Entity, and DTO layers, including where create, duplicate, soft delete, and reactivation decisions belong |
+| `docs/architecture/api-route-naming-standard.md` | Defines API route naming rules before and during Watchlist CRUD implementation |
+| `docs/architecture/repository-pattern-and-linq.md` | Explains Repository Pattern, LINQ usage, async EF Core queries, data access separation, active/inactive record lookup, and repository support for soft delete and reactivation flows |
 
 ---
 
@@ -63,8 +63,8 @@ The project documentation is organized by topic.
 | Document | Purpose |
 |---|---|
 | `docs/api-contracts/xml-summary-swagger-standard.md` | Defines XML Summary and Swagger documentation standards |
-| `docs/api-contracts/api-endpoint-draft.md` | Lists planned API endpoints and API contract decisions |
-| `docs/api-contracts/watchlist-items-api-contract.md` | Defines Watchlist Items CRUD endpoints, request and response models, status codes, validation behavior, and Swagger test flow |
+| `docs/api-contracts/api-endpoint-draft.md` | Documents the initial controller endpoint draft and the `GET /api/system/info` endpoint |
+| `docs/api-contracts/watchlist-items-api-contract.md` | Defines Watchlist Items CRUD endpoints, request and response models, status codes, validation behavior, soft delete behavior, reactivation behavior, and Swagger test flow |
 
 ---
 
@@ -72,10 +72,10 @@ The project documentation is organized by topic.
 
 | Document | Purpose |
 |---|---|
-| `docs/database-design/entity-design.md` | Explains the initial Entity and DTO model design |
+| `docs/database-design/entity-design.md` | Explains the Entity and DTO model design, including WatchlistItem lifecycle, soft delete, and reactivation behavior |
 | `docs/database-design/ef-core-sqlite-setup.md` | Documents SQLite, EF Core, AppDbContext, migration, and database setup |
 | `docs/database-design/entity-relationship-model.md` | Explains relationships between WatchlistItem, PriceSnapshot, PriceAlert, and ActionItem |
-| `docs/database-design/entity-constraint-standards.md` | Defines entity-level standards such as Symbol uniqueness, normalization, decimal usage, and UTC date fields |
+| `docs/database-design/entity-constraint-standards.md` | Defines entity-level standards such as symbol uniqueness, normalization, soft delete, reactivation, decimal usage, and UTC date fields |
 
 ---
 
@@ -84,7 +84,7 @@ The project documentation is organized by topic.
 | Document | Purpose |
 |---|---|
 | `docs/project-tracking/week-1-summary.md` | Summarizes Week 1 implementation progress and verification results |
-| `docs/project-tracking/week-2-database-summary.md` | Summarizes database setup, Repository Pattern, Watchlist Items CRUD implementation, Swagger demo flow, and Week 2 verification results |
+| `docs/project-tracking/week-2-database-summary.md` | Summarizes database setup, Repository Pattern, Watchlist Items CRUD implementation, soft delete behavior, reactivation behavior, Swagger demo flow, and Week 2 verification results |
 
 ---
 

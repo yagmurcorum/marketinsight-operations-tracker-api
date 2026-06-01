@@ -164,8 +164,38 @@ Planned Watchlist CRUD routes:
 |---|---|---|
 | List watchlist items | GET | `/api/watchlist-items` |
 | Get watchlist item by symbol | GET | `/api/watchlist-items/{symbol}` |
-| Create watchlist item | POST | `/api/watchlist-items` |
+| Create or reactivate watchlist item | POST | `/api/watchlist-items` |
 | Delete or deactivate watchlist item | DELETE | `/api/watchlist-items/{symbol}` |
+
+---
+
+## Watchlist Item Behavior
+
+The Watchlist Items API uses `NormalizedSymbol` to decide whether a symbol should be created, rejected as an active duplicate, or reactivated.
+
+Current behavior:
+
+| Existing Record State | API Behavior | Status Code |
+|---|---|---|
+| No existing record with same `NormalizedSymbol` | Create new `WatchlistItem` | `201 Created` |
+| Existing record is active | Return duplicate conflict | `409 Conflict` |
+| Existing record is inactive | Reactivate existing `WatchlistItem` | `200 OK` |
+
+The project uses soft delete instead of hard delete.
+
+When a watchlist item is deleted:
+
+    IsActive = false
+    UpdatedAtUtc = current UTC time
+
+When the same inactive symbol is posted again:
+
+    IsActive = true
+    UpdatedAtUtc = current UTC time
+
+The existing database row is reused.
+
+No duplicate row is created for the same normalized symbol.
 
 ---
 
@@ -176,8 +206,10 @@ Planned Watchlist CRUD routes:
 | Entity model | Database / persistence model |
 | DTO model | API request / response contract |
 | Entity exposure | Entity models should not be returned directly from API endpoints |
-| Symbol uniqueness | `NormalizedSymbol` should be unique |
+| Symbol uniqueness | `NormalizedSymbol` should be unique across all records |
 | Symbol normalization | Trim whitespace and convert to uppercase |
+| Soft delete | Use `IsActive = false` instead of hard delete |
+| Reactivation | Re-posting an inactive symbol reactivates the existing row |
 | Financial values | Use `decimal` |
 | Date/time values | Use UTC and `Utc` suffix |
 | SQLite database file | Do not commit local `.db` files |
@@ -210,14 +242,18 @@ Important documentation files:
 | `docs/00-index.md` | Main documentation index |
 | `docs/01-project-overview.md` | High-level project overview |
 | `docs/architecture/project-naming-standard.md` | Project, repository, solution, namespace, folder, route, and documentation naming standards |
-| `docs/architecture/layer-responsibility-standard.md` | Controller, Service, Repository, Entity, and DTO responsibility standards |
+| `docs/architecture/layer-responsibility-standard.md` | Controller, Service, Repository, Entity, and DTO responsibility standards, including create, duplicate, soft delete, and reactivation decisions |
 | `docs/architecture/api-route-naming-standard.md` | API route naming rules |
+| `docs/architecture/repository-pattern-and-linq.md` | Repository Pattern, LINQ usage, async EF Core queries, data access separation, active/inactive record lookup, and repository support for soft delete and reactivation flows |
+| `docs/database-design/entity-design.md` | Entity and DTO model design, including WatchlistItem lifecycle, soft delete, and reactivation behavior |
 | `docs/database-design/entity-relationship-model.md` | Entity relationship model |
-| `docs/database-design/entity-constraint-standards.md` | Symbol uniqueness, normalization, decimal, UTC, and persistence standards |
+| `docs/database-design/entity-constraint-standards.md` | Symbol uniqueness, normalization, soft delete, reactivation, decimal, UTC, and persistence standards |
 | `docs/database-design/ef-core-sqlite-setup.md` | EF Core and SQLite setup notes |
 | `docs/api-contracts/xml-summary-swagger-standard.md` | XML Summary and Swagger documentation standard |
-| `docs/api-contracts/api-endpoint-draft.md` | Planned API endpoint draft |
+| `docs/api-contracts/api-endpoint-draft.md` | Initial controller endpoint draft and `GET /api/system/info` endpoint documentation |
+| `docs/api-contracts/watchlist-items-api-contract.md` | Watchlist Items API contract, status codes, soft delete, reactivation behavior, and Swagger test flow |
 | `docs/project-tracking/week-1-summary.md` | Week 1 progress summary |
+| `docs/project-tracking/week-2-database-summary.md` | Week 2 database, Repository Pattern, Watchlist CRUD, soft delete, reactivation, and Swagger verification summary |
 
 ---
 
@@ -358,5 +394,7 @@ It exists to practice professional backend development concepts through a small 
 The repository contains only the backend API component.
 
 The project uses a learning-focused layered monolith architecture and separates responsibilities across Controller, Service, Repository, Entity, and DTO layers.
+
+The Watchlist Items API uses normalized symbols, soft delete, and reactivation behavior to keep data consistent while providing clear API behavior.
 
 Detailed technical decisions are documented under the `docs/` folder.

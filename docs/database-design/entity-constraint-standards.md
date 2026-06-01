@@ -2,7 +2,7 @@
 
 This document defines the entity-level constraint and data consistency standards for the MarketInsight Operations Tracker API.
 
-The purpose of this document is to clarify important database and validation decisions before implementing Repository Pattern, LINQ queries, and Watchlist CRUD endpoints.
+The purpose of this document is to clarify important database and validation decisions before implementing and maintaining Repository Pattern, LINQ queries, Watchlist CRUD endpoints, soft delete behavior, and reactivation behavior.
 
 ---
 
@@ -14,6 +14,8 @@ This document defines standards for:
 
 - Symbol uniqueness
 - Symbol normalization
+- Soft delete behavior
+- Reactivation behavior
 - Financial value types
 - UTC date/time fields
 - Entity validation responsibilities
@@ -32,6 +34,8 @@ Examples of possible problems:
 
 - The same symbol may be added multiple times.
 - `aapl`, `Aapl`, and `AAPL` may be treated as different symbols.
+- A soft-deleted symbol may disappear from the active list but still block future create requests.
+- A deleted symbol may create confusing API behavior if reactivation is not defined.
 - Financial values may lose precision if `double` or `float` is used.
 - Date values may become inconsistent if local time and UTC are mixed.
 - API validation may allow data that the database should reject.
@@ -45,8 +49,10 @@ This document prevents these problems by defining clear standards.
 
 | Area | Standard |
 |---|---|
-| Symbol uniqueness | One normalized symbol should exist only once |
+| Symbol uniqueness | One normalized symbol should exist only once in the table |
 | Symbol normalization | Trim whitespace and convert to uppercase |
+| Soft delete | Use `IsActive = false` instead of hard delete |
+| Reactivation | Reuse inactive existing record when the same symbol is posted again |
 | Financial values | Use `decimal` |
 | Date/time values | Use UTC and name fields with `Utc` suffix |
 | Entity response exposure | Do not return Entity models directly from API endpoints |
@@ -59,7 +65,7 @@ This document prevents these problems by defining clear standards.
 
 ### Decision
 
-The same financial symbol should not be added to the watchlist more than once.
+The same financial symbol should not be added to the watchlist more than once as separate database rows.
 
 The project should treat these values as the same symbol:
 
@@ -72,9 +78,15 @@ After normalization, all of them become:
 
     AAPL
 
-Therefore, only one `WatchlistItem` should exist for:
+Therefore, only one `WatchlistItem` database row should exist for:
 
     AAPL
+
+If that row is active, a duplicate create request should return:
+
+    409 Conflict
+
+If that row is inactive because of soft delete, a create request for the same symbol should reactivate the existing row instead of inserting a new row.
 
 ---
 
@@ -92,6 +104,8 @@ Possible problems:
 - Duplicate alerts
 - Confusing API responses
 - Incorrect future analysis or reporting
+- Harder data cleanup
+- Unclear historical lifecycle for deleted and re-added symbols
 
 ---
 
@@ -103,7 +117,9 @@ Main rule:
 
     NormalizedSymbol must be unique.
 
-This means the system should use `NormalizedSymbol` for lookup and duplicate checks.
+This means the system should use `NormalizedSymbol` for lookup, duplicate checks, and reactivation checks.
+
+The database should not contain multiple rows for the same normalized symbol.
 
 ---
 
@@ -111,8 +127,8 @@ This means the system should use `NormalizedSymbol` for lookup and duplicate che
 
 | Field | Purpose |
 |---|---|
-| `Symbol` | Stores the original or display symbol value |
-| `NormalizedSymbol` | Stores the normalized value used for lookup, comparison, and duplicate control |
+| `Symbol` | Stores the display symbol value used by the API response |
+| `NormalizedSymbol` | Stores the normalized value used for lookup, comparison, duplicate control, and reactivation |
 
 Example:
 
@@ -175,7 +191,7 @@ Recommended placement:
 | Layer | Responsibility |
 |---|---|
 | Controller | Receives the raw request |
-| Service | Normalizes the symbol |
+| Service | Normalizes the symbol and decides business behavior |
 | Repository | Uses normalized value for query/persistence |
 | Database | Stores normalized value and enforces uniqueness |
 
@@ -195,11 +211,13 @@ The Service layer should coordinate this rule.
           ↓
     Service trims and uppercases symbol
           ↓
-    Service checks duplicate rule using repository
+    Service checks existing record using repository
           ↓
     Repository queries by NormalizedSymbol
           ↓
-    Entity is saved with normalized value
+    Service decides create, duplicate conflict, or reactivation
+          ↓
+    Entity is saved or updated
 
 ---
 
@@ -221,6 +239,20 @@ Entity values:
 
     Symbol = "AAPL"
     NormalizedSymbol = "AAPL"
+
+If no existing record exists:
+
+    Create new WatchlistItem
+    Return 201 Created
+
+If an active record exists:
+
+    Return 409 Conflict
+
+If an inactive record exists:
+
+    Reactivate existing WatchlistItem
+    Return 200 OK
 
 ---
 
@@ -269,11 +301,18 @@ This is configured through EF Core and represented by migration files.
 
 The project uses `IsActive` to represent active/passive watchlist records.
 
-This means deletion may be implemented as soft delete:
+Deletion is implemented as soft delete:
 
     IsActive = false
+    UpdatedAtUtc = current UTC time
 
-There are two possible uniqueness approaches.
+Soft delete means the database row remains in the table.
+
+The active list endpoint should not return inactive records.
+
+The detail endpoint should not return inactive records as active resources.
+
+However, inactive records still exist in the database and can be used for reactivation.
 
 ---
 
@@ -287,11 +326,17 @@ Pros:
 
 - Simple.
 - Easy to understand.
-- Prevents historical duplicate records.
+- Prevents historical duplicate rows.
+- Keeps one lifecycle per symbol.
+- Works well with SQLite.
+- Keeps the unique index simple.
 
 Cons:
 
 - Re-adding a deleted symbol requires reactivating the old record instead of inserting a new one.
+- Application logic must distinguish active duplicates from inactive records.
+
+This is the current project decision.
 
 ---
 
@@ -304,18 +349,22 @@ Rule:
 Pros:
 
 - Allows historical inactive records.
-- Allows re-adding a symbol after deletion.
+- Allows re-adding a symbol after deletion as a new row.
 
 Cons:
 
 - Requires more careful database constraint design.
 - May require filtered unique index support depending on database provider.
+- Can produce multiple historical rows for the same symbol.
+- Adds unnecessary complexity for the current learning-focused MVP.
+
+This option is not used in the current project.
 
 ---
 
 ## Current MVP Decision
 
-For the current MVP, the project should use the simpler rule:
+For the current MVP, the project uses the simpler and more consistent rule:
 
     NormalizedSymbol should be unique across all records.
 
@@ -323,9 +372,103 @@ This means:
 
     One symbol should have one watchlist item record.
 
-If the user deletes a symbol and later adds it again, the application may reactivate the existing record in a future implementation.
+Current behavior:
 
-This keeps the beginner MVP simpler and avoids unnecessary complexity.
+| Existing Record State | POST Behavior | Status Code |
+|---|---|---|
+| No existing record | Create a new `WatchlistItem` | `201 Created` |
+| Existing record is active | Return duplicate conflict | `409 Conflict` |
+| Existing record is inactive | Reactivate existing `WatchlistItem` | `200 OK` |
+
+This keeps the beginner MVP simple while also avoiding confusing API behavior.
+
+A soft-deleted symbol should not be inserted as a new row.
+
+A soft-deleted symbol should be reactivated by setting:
+
+    IsActive = true
+    UpdatedAtUtc = current UTC time
+
+The original `CreatedAtUtc` should remain unchanged.
+
+---
+
+## Reactivation Standard
+
+### Decision
+
+If a client posts a symbol that already exists as an inactive `WatchlistItem`, the application should reactivate the existing record.
+
+Reactivation means:
+
+    IsActive = true
+    UpdatedAtUtc = current UTC time
+
+The application may also update these fields from the request:
+
+    DisplayName
+    Market
+
+Reactivation should not change:
+
+    Id
+    CreatedAtUtc
+
+Reactivation should not create:
+
+    A new WatchlistItem row
+
+Expected API result:
+
+    200 OK
+
+---
+
+## Why Reactivation Is Needed
+
+Without reactivation, the API can become confusing.
+
+Example problematic behavior:
+
+    GET /api/watchlist-items → []
+    POST /api/watchlist-items with AAPL → 409 Conflict
+    DELETE /api/watchlist-items/AAPL → 404 Not Found
+
+From the client perspective, this feels inconsistent:
+
+    The list says the symbol is not active.
+    Create says the symbol already exists.
+    Delete says the symbol is not found.
+
+Reactivation solves this by defining a clear lifecycle:
+
+    Create new symbol → active
+    Delete symbol → inactive
+    Post same symbol again → active again
+
+This keeps one database row per symbol and makes the API easier to understand.
+
+---
+
+## Soft Delete and Reactivation Lifecycle
+
+The WatchlistItem lifecycle is:
+
+    New symbol is created
+          ↓
+    IsActive = true
+          ↓
+    Symbol is deleted
+          ↓
+    IsActive = false
+          ↓
+    Same symbol is posted again
+          ↓
+    Existing row is reactivated
+          ↓
+    IsActive = true
+
+This lifecycle avoids duplicate rows while still allowing the user to add a previously deleted symbol again.
 
 ---
 
@@ -489,6 +632,24 @@ Reason:
 
 ---
 
+## Date Update Standard
+
+When updating, soft deleting, or reactivating an existing record, use UTC time.
+
+Recommended logic:
+
+    UpdatedAtUtc = DateTime.UtcNow
+
+This applies to:
+
+- Soft delete
+- Reactivation
+- Future update operations
+- Future alert state changes
+- Future action item completion
+
+---
+
 ## Entity Response Exposure Standard
 
 Entity models should not be returned directly from API endpoints.
@@ -531,9 +692,9 @@ Validation should be separated by responsibility.
 | Validation Type | Recommended Place | Example |
 |---|---|---|
 | Basic request validation | DTO / Controller model validation | Required `Symbol` |
-| Business rule validation | Service | Duplicate symbol rule |
+| Business rule validation | Service | Active duplicate rule and inactive reactivation rule |
 | Database consistency | Database constraint / EF Core configuration | Unique `NormalizedSymbol` |
-| Data access existence check | Repository | `ExistsBySymbolAsync` |
+| Data access existence check | Repository | `GetByNormalizedSymbolAsync` |
 
 ---
 
@@ -545,13 +706,15 @@ Validation should be separated by responsibility.
           ↓
     Service normalizes Symbol
           ↓
-    Service asks Repository if NormalizedSymbol exists
+    Service asks Repository for existing NormalizedSymbol
           ↓
     Repository checks database
           ↓
-    Service decides whether creation is allowed
+    Service checks existing record state
           ↓
-    Repository persists Entity
+    Service decides whether to create, reject, or reactivate
+          ↓
+    Repository persists Entity changes
 
 ---
 
@@ -559,13 +722,9 @@ Validation should be separated by responsibility.
 
 Repository queries should use normalized values when looking up symbols.
 
-Example future method:
+Current method:
 
     GetByNormalizedSymbolAsync
-
-or:
-
-    GetBySymbolAsync
 
 The implementation should compare against:
 
@@ -574,6 +733,15 @@ The implementation should compare against:
 Reason:
 
     The system should not depend on the casing or whitespace of user input.
+
+Important distinction:
+
+    GetAllActiveAsync should return only active records.
+    GetByNormalizedSymbolAsync should be able to return active or inactive records.
+
+Reason:
+
+    The create flow needs to detect inactive records for reactivation.
 
 ---
 
@@ -589,7 +757,7 @@ Reason:
 | `Market` | Optional |
 | `IsActive` | Required |
 | `CreatedAtUtc` | Required |
-| `UpdatedAtUtc` | Optional |
+| `UpdatedAtUtc` | Optional; used for soft delete and reactivation |
 
 ---
 
@@ -661,7 +829,7 @@ Current EF Core configuration includes:
 
 Additional configuration may be introduced gradually as the project grows.
 
-The documented standards should continue to guide future CRUD, Repository Pattern, and LINQ implementation.
+The documented standards should continue to guide future CRUD, Repository Pattern, LINQ, Redis, RabbitMQ, and Background Worker implementation.
 
 ---
 
@@ -680,6 +848,8 @@ Example EF Core configuration:
     HasIndex(x => x.NormalizedSymbol).IsUnique()
 
 This has been applied through EF Core model configuration and migration.
+
+The unique index remains compatible with soft delete because the application reactivates inactive records instead of inserting duplicate rows.
 
 ---
 
@@ -781,7 +951,10 @@ Example:
 
 API responsibility:
 
-    Check duplicate symbol before creating a new item.
+    Normalize symbol.
+    Check existing symbol.
+    Return conflict when the existing symbol is active.
+    Reactivate the existing row when the existing symbol is inactive.
 
 Database responsibility:
 
@@ -798,30 +971,37 @@ Reason:
 
 | Decision Area | Current Decision |
 |---|---|
-| Duplicate symbols | Not allowed |
+| Duplicate symbols | Active duplicate symbols are not allowed |
 | Symbol comparison | Use normalized symbol |
 | Symbol normalization | Trim + uppercase |
+| Soft delete | Use `IsActive = false` |
+| Reactivation | POST same inactive symbol reactivates existing row |
+| Unique symbol storage | One row per `NormalizedSymbol` |
 | Financial values | Use decimal |
 | Date/time values | Use UTC |
 | Entity responses | Use DTOs, not Entities |
 | SQLite database file | Do not commit |
 | Migration files | Commit |
-| Watchlist delete behavior | Soft delete can be used through `IsActive` |
+| Watchlist delete behavior | Soft delete through `IsActive` |
 
 ---
 
 ## Review Checklist
 
-Before implementing Watchlist CRUD, check:
+Before implementing or modifying Watchlist CRUD, check:
 
 - Is `Symbol` required?
 - Is `NormalizedSymbol` required?
 - Is `NormalizedSymbol` used for duplicate checks?
-- Is the duplicate symbol rule clear?
+- Is `NormalizedSymbol` unique across all records?
+- Is the active duplicate symbol rule clear?
+- Is the inactive reactivation rule clear?
 - Is symbol normalization defined as trim + uppercase?
 - Are financial values using `decimal`?
 - Are date/time fields using UTC?
 - Do UTC fields use the `Utc` suffix?
+- Is `UpdatedAtUtc` updated during soft delete?
+- Is `UpdatedAtUtc` updated during reactivation?
 - Are Entity models not returned directly from API endpoints?
 - Are DTOs used for request and response contracts?
 - Are migration files committed?
@@ -837,12 +1017,22 @@ When implementing Repository Pattern and Watchlist CRUD, the following should be
 
 - Verify unique index on `NormalizedSymbol`.
 - Normalize symbol before save and lookup.
-- Reject duplicate symbols at API/service level.
+- Reject active duplicate symbols at API/service level.
+- Reactivate inactive existing symbols instead of inserting duplicate rows.
 - Use DTOs for API request and response models.
 - Keep Entity models inside persistence flow.
 - Use `decimal` for price-related values.
 - Use `DateTime.UtcNow` for created/updated timestamps.
+- Update `UpdatedAtUtc` during soft delete and reactivation.
 - Keep SQLite database files out of Git.
+
+Future features should continue to respect these standards:
+
+- Price refresh should use active watchlist items.
+- Redis cache keys should use normalized symbols.
+- RabbitMQ messages should use normalized symbols.
+- Background Worker processing should validate that the watchlist item is active before processing.
+- Price snapshots should reference the correct `WatchlistItemId`.
 
 ---
 
@@ -854,7 +1044,12 @@ Core rules:
 
 - `Symbol` must be normalized.
 - `NormalizedSymbol` should be unique.
-- Duplicate watchlist symbols are not allowed.
+- One normalized symbol should map to one database row.
+- Active duplicate watchlist symbols are not allowed.
+- Inactive existing symbols should be reactivated instead of inserted as new rows.
+- Soft delete should use `IsActive = false`.
+- Reactivation should use `IsActive = true`.
+- `UpdatedAtUtc` should be updated during soft delete and reactivation.
 - Financial values should use `decimal`.
 - Date/time fields should use UTC.
 - UTC fields should use the `Utc` suffix.
@@ -862,4 +1057,4 @@ Core rules:
 - Migration files should be committed.
 - Local SQLite database files should not be committed.
 
-These standards should guide Repository Pattern, LINQ, and Watchlist CRUD implementation.
+These standards should guide Repository Pattern, LINQ, Watchlist CRUD, Redis, RabbitMQ, Background Worker, and future backend implementation.

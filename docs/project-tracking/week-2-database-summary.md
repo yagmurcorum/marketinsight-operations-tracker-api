@@ -58,6 +58,8 @@ The implementation includes:
 - Watchlist Items Service layer
 - Watchlist Items Controller
 - Watchlist Items CRUD endpoints
+- Soft delete behavior
+- Reactivation behavior for inactive watchlist items
 - Swagger test flow
 - API contract documentation
 
@@ -69,8 +71,8 @@ The implementation includes:
 |---|---|---|
 | `GET` | `/api/watchlist-items` | Gets all active watchlist items |
 | `GET` | `/api/watchlist-items/{symbol}` | Gets a watchlist item by symbol |
-| `POST` | `/api/watchlist-items` | Creates a new watchlist item |
-| `DELETE` | `/api/watchlist-items/{symbol}` | Deletes a watchlist item by symbol |
+| `POST` | `/api/watchlist-items` | Creates a new watchlist item or reactivates an inactive existing item |
+| `DELETE` | `/api/watchlist-items/{symbol}` | Deletes a watchlist item by symbol using soft delete behavior |
 
 ---
 
@@ -117,7 +119,7 @@ HTTP Response
 | Layer | Responsibility |
 |---|---|
 | Controller | Handles HTTP routes, request entry, and response status codes |
-| Service | Handles business rules, symbol normalization, duplicate checks, soft delete behavior, and DTO mapping |
+| Service | Handles business rules, symbol normalization, active duplicate checks, inactive record reactivation, soft delete behavior, and DTO mapping |
 | Repository | Handles data access through EF Core and LINQ |
 | Entity | Represents database persistence models |
 | DTO | Represents API request and response contracts |
@@ -127,7 +129,7 @@ Important rules:
 - Controller does not contain business logic.
 - Controller does not directly use `AppDbContext`.
 - Controller does not return Entity models directly.
-- Service owns symbol normalization and duplicate symbol behavior.
+- Service owns symbol normalization, active duplicate behavior, inactive record reactivation, and soft delete behavior.
 - Repository only handles data access.
 - API responses use DTOs.
 
@@ -260,7 +262,17 @@ Important fields:
 | `Market` | Optional market or exchange value |
 | `IsActive` | Indicates whether the item is active |
 | `CreatedAtUtc` | UTC creation time |
-| `UpdatedAtUtc` | UTC update time |
+| `UpdatedAtUtc` | UTC update time for delete or reactivation operations |
+
+The system uses soft delete instead of hard delete.
+
+This means a deleted `WatchlistItem` remains in the database with:
+
+```text
+IsActive = false
+```
+
+If the same symbol is submitted again through `POST /api/watchlist-items`, the inactive existing record is reactivated instead of creating a duplicate database row.
 
 ---
 
@@ -290,7 +302,7 @@ This makes symbol lookup and duplicate checks consistent.
 
 ## Duplicate Symbol Rule
 
-The system does not allow duplicate normalized symbols.
+The system does not allow duplicate active normalized symbols.
 
 Example:
 
@@ -308,7 +320,7 @@ AAPL
 
 Therefore, they are treated as the same symbol.
 
-If the same normalized symbol already exists, the API returns:
+If the same normalized symbol already exists as an active record, the API returns:
 
 ```text
 409 Conflict
@@ -320,6 +332,95 @@ Example response:
 {
   "message": "Watchlist item with symbol 'AAPL' already exists."
 }
+```
+
+Important distinction:
+
+```text
+No existing symbol       → 201 Created
+Existing active symbol   → 409 Conflict
+Existing inactive symbol → 200 OK and reactivated
+```
+
+---
+
+## Soft Delete Behavior
+
+Delete operation uses soft delete behavior.
+
+When a watchlist item is deleted:
+
+```text
+IsActive = false
+UpdatedAtUtc = current UTC time
+```
+
+The record remains in the database.
+
+The item no longer appears in active list results.
+
+The item no longer returns from the detail endpoint as an active item.
+
+This means:
+
+```text
+GET /api/watchlist-items
+```
+
+only returns active records.
+
+A soft-deleted record may still exist in the database even if it is not visible in the active list.
+
+---
+
+## Reactivation Behavior
+
+Reactivation handles the case where a symbol already exists in the database but is inactive because of soft delete.
+
+If the client sends:
+
+```http
+POST /api/watchlist-items
+```
+
+with a symbol that already exists as an inactive record, the API reactivates the existing row.
+
+Reactivation sets:
+
+```text
+IsActive = true
+UpdatedAtUtc = current UTC client sends:
+
+```http
+POST /api/watchlist-items
+```
+
+with a symbol that already exists as an inactive record, the API reactivates the existing row.
+
+Reactivation sets time
+```
+
+Reactivation may update:
+
+```text
+DisplayName
+Market
+```
+
+from the request body.
+
+Reactivation does not change the original:
+
+```text
+CreatedAtUtc
+```
+
+Reactivation does not create a new database row.
+
+Expected result:
+
+```text
+200 OK
 ```
 
 ---
@@ -334,12 +435,22 @@ NormalizedSymbol
 
 This ensures that duplicate symbols are not inserted into the database.
 
-The Service layer also checks duplicates before attempting to create a new record.
+The unique index remains valid because the system does not create a new row for a soft-deleted symbol.
+
+Instead, the Service layer follows this behavior:
+
+| Existing Record State | POST Behavior | Status Code |
+|---|---|---|
+| No existing record | Create a new `WatchlistItem` | `201 Created` |
+| Existing record is active | Return duplicate conflict | `409 Conflict` |
+| Existing record is inactive | Reactivate existing `WatchlistItem` | `200 OK` |
 
 This gives both:
 
 - Better API behavior
 - Stronger database consistency
+- No duplicate database rows for the same normalized symbol
+- Cleaner soft delete lifecycle
 
 ---
 
@@ -394,10 +505,12 @@ Implemented repository methods:
 | Method | Purpose |
 |---|---|
 | `GetAllActiveAsync` | Gets all active watchlist items |
-| `GetByNormalizedSymbolAsync` | Gets one item by normalized symbol |
+| `GetByNormalizedSymbolAsync` | Gets one item by normalized symbol, including inactive records |
 | `ExistsByNormalizedSymbolAsync` | Checks whether a normalized symbol exists |
 | `AddAsync` | Adds a new watchlist item to the EF Core change tracker |
 | `SaveChangesAsync` | Saves pending changes to the database |
+
+Reactivation uses `GetByNormalizedSymbolAsync` so that the Service can inspect whether the existing record is active or inactive.
 
 ---
 
@@ -447,11 +560,22 @@ WatchlistItemService
 Service responsibilities:
 
 - Normalize symbols
-- Check duplicate symbols
-- Create WatchlistItem entities
+- Check whether a matching normalized symbol exists
+- Return `409 Conflict` behavior for active duplicates
+- Reactivate inactive existing watchlist items
+- Create new WatchlistItem entities
 - Map entities to DTO responses
 - Handle soft delete behavior
 - Coordinate repository calls
+
+The Service owns the following business rules:
+
+```text
+New symbol → create new record
+Active existing symbol → duplicate conflict
+Inactive existing symbol → reactivate existing record
+Delete active symbol → set IsActive to false
+```
 
 ---
 
@@ -485,7 +609,16 @@ The Controller does not:
 - Contain database queries
 - Contain symbol normalization logic
 - Contain duplicate symbol business logic
+- Contain reactivation business logic
 - Return Entity models directly
+
+The Controller maps Service results to HTTP responses:
+
+| Service Result | HTTP Response |
+|---|---|
+| Created | `201 Created` |
+| Reactivated | `200 OK` |
+| Duplicate | `409 Conflict` |
 
 ---
 
@@ -494,19 +627,30 @@ The Controller does not:
 | Scenario | Status Code |
 |---|---|
 | Get active watchlist items | `200 OK` |
-| Get existing symbol | `200 OK` |
+| Get existing active symbol | `200 OK` |
 | Get missing symbol | `404 Not Found` |
-| Create valid watchlist item | `201 Created` |
+| Get inactive symbol | `404 Not Found` |
+| Create new valid watchlist item | `201 Created` |
+| Reactivate inactive existing watchlist item | `200 OK` |
 | Create invalid request | `400 Bad Request` |
-| Create duplicate symbol | `409 Conflict` |
-| Delete existing symbol | `204 No Content` |
+| Create active duplicate symbol | `409 Conflict` |
+| Delete existing active symbol | `204 No Content` |
 | Delete missing symbol | `404 Not Found` |
+| Delete inactive symbol | `404 Not Found` |
 
 ---
 
 ## Swagger Demo Flow
 
 The Watchlist Items API can be tested through Swagger UI.
+
+For a clean manual test, use a symbol that is easy to identify, such as:
+
+```text
+MSFT
+```
+
+---
 
 ### 1. List Active Items
 
@@ -532,7 +676,7 @@ or a list of active items if data already exists.
 
 ---
 
-### 2. Create AAPL
+### 2. Create MSFT
 
 Request:
 
@@ -544,8 +688,8 @@ Body:
 
 ```json
 {
-  "symbol": "aapl",
-  "displayName": "Apple Inc.",
+  "symbol": "msft",
+  "displayName": "Microsoft Corporation",
   "market": "NASDAQ"
 }
 ```
@@ -559,7 +703,7 @@ Expected result:
 Expected response includes:
 
 ```json
-"symbol": "AAPL"
+"symbol": "MSFT"
 ```
 
 This confirms symbol normalization.
@@ -583,17 +727,17 @@ Expected result:
 Expected behavior:
 
 ```text
-AAPL appears in the active watchlist item list.
+MSFT appears in the active watchlist item list.
 ```
 
 ---
 
-### 4. Get AAPL Detail
+### 4. Get MSFT Detail
 
 Request:
 
 ```http
-GET /api/watchlist-items/aapl
+GET /api/watchlist-items/msft
 ```
 
 Expected result:
@@ -605,14 +749,14 @@ Expected result:
 Expected response includes:
 
 ```json
-"symbol": "AAPL"
+"symbol": "MSFT"
 ```
 
 This confirms normalized lookup.
 
 ---
 
-### 5. Try Duplicate AAPL
+### 5. Try Duplicate MSFT While Active
 
 Request:
 
@@ -624,8 +768,8 @@ Body:
 
 ```json
 {
-  "symbol": "AAPL",
-  "displayName": "Apple Inc.",
+  "symbol": "MSFT",
+  "displayName": "Microsoft Corporation",
   "market": "NASDAQ"
 }
 ```
@@ -640,18 +784,24 @@ Expected response:
 
 ```json
 {
-  "message": "Watchlist item with symbol 'AAPL' already exists."
+  "message": "Watchlist item with symbol 'MSFT' already exists."
 }
+```
+
+Reason:
+
+```text
+MSFT already exists and is active.
 ```
 
 ---
 
-### 6. Delete AAPL
+### 6. Delete MSFT
 
 Request:
 
 ```http
-DELETE /api/watchlist-items/aapl
+DELETE /api/watchlist-items/msft
 ```
 
 Expected result:
@@ -668,12 +818,12 @@ The item becomes inactive.
 
 ---
 
-### 7. Confirm AAPL Is No Longer Active
+### 7. Confirm MSFT Is No Longer Active
 
 Request:
 
 ```http
-GET /api/watchlist-items/aapl
+GET /api/watchlist-items/msft
 ```
 
 Expected result:
@@ -686,6 +836,98 @@ Reason:
 
 ```text
 The record exists in the database but is no longer active.
+```
+
+---
+
+### 8. Re-add MSFT After Delete
+
+Request:
+
+```http
+POST /api/watchlist-items
+```
+
+Body:
+
+```json
+{
+  "symbol": "msft",
+  "displayName": "Microsoft Corporation",
+  "market": "NASDAQ"
+}
+```
+
+Expected result:
+
+```text
+200 OK
+```
+
+Expected response includes:
+
+```json
+"isActive": true
+```
+
+Reason:
+
+```text
+The existing inactive MSFT record is reactivated instead of creating a duplicate row.
+```
+
+---
+
+### 9. List Items After Reactivation
+
+Request:
+
+```http
+GET /api/watchlist-items
+```
+
+Expected result:
+
+```text
+200 OK
+```
+
+Expected behavior:
+
+```text
+MSFT appears again in the active watchlist item list.
+```
+
+---
+
+### 10. Try Duplicate MSFT After Reactivation
+
+Request:
+
+```http
+POST /api/watchlist-items
+```
+
+Body:
+
+```json
+{
+  "symbol": "MSFT",
+  "displayName": "Microsoft Corporation",
+  "market": "NASDAQ"
+}
+```
+
+Expected result:
+
+```text
+409 Conflict
+```
+
+Reason:
+
+```text
+MSFT is active again, so it is treated as an active duplicate.
 ```
 
 ---
@@ -713,14 +955,17 @@ This makes the API easier to test and explain.
 During a demo, the flow can be explained as:
 
 ```text
-First, the empty watchlist is listed.
+First, the active watchlist is listed.
 Then a symbol is created with lowercase input.
 The API stores it as uppercase through Service-layer normalization.
 The list endpoint confirms the item exists.
 The detail endpoint confirms symbol lookup works.
-The duplicate create request returns 409 Conflict.
+The duplicate create request returns 409 Conflict while the item is active.
 The delete endpoint performs soft delete.
 The detail endpoint returns 404 because inactive records are not exposed as active resources.
+When the same symbol is posted again, the existing inactive database record is reactivated.
+The list endpoint confirms the symbol appears again.
+A duplicate create request after reactivation returns 409 Conflict because the item is active again.
 ```
 
 ---
@@ -735,7 +980,8 @@ Expected board state:
 |---|---|
 | Repository Pattern implementation | Done |
 | Watchlist Items CRUD implementation | Done |
-| Database and CRUD documentation | Done after this document and index update |
+| Soft delete reactivation behavior | Done |
+| Database and CRUD documentation | Done after this document and related documentation updates |
 
 ---
 
@@ -746,8 +992,8 @@ Related documentation:
 | Document | Purpose |
 |---|---|
 | `docs/architecture/repository-pattern-and-linq.md` | Explains Repository Pattern, LINQ, async EF Core queries, and data access separation |
-| `docs/api-contracts/watchlist-items-api-contract.md` | Defines Watchlist Items API endpoints, status codes, request/response models, and Swagger test flow |
-| `docs/project-tracking/week-2-database-summary.md` | Summarizes database, repository, CRUD, and demo behavior |
+| `docs/api-contracts/watchlist-items-api-contract.md` | Defines Watchlist Items API endpoints, status codes, request/response models, soft delete behavior, reactivation behavior, and Swagger test flow |
+| `docs/project-tracking/week-2-database-summary.md` | Summarizes database, repository, CRUD, soft delete, reactivation, and demo behavior |
 | `docs/00-index.md` | Main documentation index that references project documentation |
 
 ---
@@ -762,7 +1008,7 @@ Related documentation:
 | `docs/database-design/entity-design.md` | Explains Entity and DTO design |
 | `docs/database-design/ef-core-sqlite-setup.md` | Documents EF Core and SQLite setup |
 | `docs/database-design/entity-relationship-model.md` | Explains entity relationships |
-| `docs/database-design/entity-constraint-standards.md` | Defines uniqueness, normalization, decimal, and UTC standards |
+| `docs/database-design/entity-constraint-standards.md` | Defines uniqueness, normalization, decimal, UTC, soft delete, and reactivation standards |
 
 ---
 
@@ -781,9 +1027,15 @@ Related documentation:
 | `/api/watchlist-items` route standard is used | Done |
 | Entity models are not returned directly from Controller | Done |
 | Symbol normalization works | Done |
-| Duplicate symbol returns `409 Conflict` | Done |
-| Create endpoint returns `201 Created` | Done |
+| New symbol returns `201 Created` | Done |
+| Active duplicate symbol returns `409 Conflict` | Done |
 | Delete endpoint returns `204 No Content` | Done |
+| Deleted symbol returns `404 Not Found` from detail endpoint | Done |
+| Inactive watchlist item can be reactivated by POST | Done |
+| Reactivation returns `200 OK` | Done |
+| Reactivation does not create a duplicate database row | Done |
+| Reactivated item appears again in active list | Done |
+| Duplicate request after reactivation returns `409 Conflict` | Done |
 | Missing symbol returns `404 Not Found` | Done |
 | Swagger test flow is documented | Done |
 | Project builds successfully | Done |
@@ -815,9 +1067,20 @@ The implementation follows the project standards for:
 - DTO and Entity separation
 - API route naming
 - Symbol normalization
-- Duplicate symbol handling
+- Active duplicate symbol handling
+- Soft delete behavior
+- Inactive record reactivation
+- Unique `NormalizedSymbol` database protection
 - UTC timestamps
 - SQLite database usage
 - Swagger-based testing
 
-This completes the database, repository, and Watchlist Items CRUD documentation scope.
+The final WatchlistItem create behavior is:
+
+```text
+New symbol → 201 Created
+Active existing symbol → 409 Conflict
+Inactive existing symbol → 200 OK and reactivated
+```
+
+This completes the database, repository, Watchlist Items CRUD, soft delete, and reactivation documentation scope.
