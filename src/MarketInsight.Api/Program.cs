@@ -5,6 +5,7 @@ using MarketInsight.Api.Providers.Quotes;
 using MarketInsight.Api.Repositories;
 using MarketInsight.Api.Services;
 using MarketInsight.Api.Services.Cache;
+using MarketInsight.Api.Services.Quotes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -18,7 +19,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IWatchlistItemRepository, WatchlistItemRepository>();
+builder.Services.AddScoped<IPriceSnapshotRepository, PriceSnapshotRepository>();
+
 builder.Services.AddScoped<IWatchlistItemService, WatchlistItemService>();
+builder.Services.AddScoped<IQuoteRefreshService, QuoteRefreshService>();
 
 builder.Services.Configure<FinanceApiOptions>(
     builder.Configuration.GetSection("FinanceApi"));
