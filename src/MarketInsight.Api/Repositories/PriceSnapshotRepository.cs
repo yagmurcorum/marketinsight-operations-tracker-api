@@ -1,5 +1,6 @@
 using MarketInsight.Api.Data;
 using MarketInsight.Api.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace MarketInsight.Api.Repositories;
 
@@ -17,6 +18,16 @@ public class PriceSnapshotRepository : IPriceSnapshotRepository
     public PriceSnapshotRepository(AppDbContext context)
     {
         _context = context;
+    }
+
+    /// <inheritdoc />
+    public async Task<List<PriceSnapshot>> GetByWatchlistItemIdAsync(int watchlistItemId)
+    {
+        return await _context.PriceSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.WatchlistItemId == watchlistItemId)
+            .OrderByDescending(snapshot => snapshot.CreatedAtUtc)
+            .ToListAsync();
     }
 
     /// <inheritdoc />

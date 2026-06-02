@@ -114,6 +114,38 @@ public class QuoteRefreshService : IQuoteRefreshService
         return QuoteRefreshResult.Success(response);
     }
 
+    /// <inheritdoc />
+    public async Task<List<PriceSnapshotResponse>?> GetSnapshotsAsync(
+        string symbol,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(symbol))
+        {
+            return null;
+        }
+
+        var normalizedSymbol = NormalizeSymbol(symbol);
+
+        var watchlistItem = await _watchlistItemRepository.GetByNormalizedSymbolAsync(normalizedSymbol);
+
+        if (watchlistItem is null || !watchlistItem.IsActive)
+        {
+            _logger.LogWarning(
+                "Active watchlist item was not found while listing snapshots for symbol {Symbol}.",
+                normalizedSymbol);
+
+            return null;
+        }
+
+        var snapshots = await _priceSnapshotRepository.GetByWatchlistItemIdAsync(watchlistItem.Id);
+
+        return snapshots
+            .Select(MapToPriceSnapshotResponse)
+            .ToList();
+    }
+
     private static PriceSnapshot CreatePriceSnapshot(
         WatchlistItem watchlistItem,
         QuoteResponse quote)
@@ -151,6 +183,21 @@ public class QuoteRefreshService : IQuoteRefreshService
             RetrievedAtUtc = quote.RetrievedAtUtc,
             PriceSnapshotId = priceSnapshot.Id,
             SnapshotCreatedAtUtc = priceSnapshot.CreatedAtUtc
+        };
+    }
+
+    private static PriceSnapshotResponse MapToPriceSnapshotResponse(PriceSnapshot snapshot)
+    {
+        return new PriceSnapshotResponse
+        {
+            Id = snapshot.Id,
+            WatchlistItemId = snapshot.WatchlistItemId,
+            Symbol = snapshot.Symbol,
+            Price = snapshot.Price,
+            Currency = snapshot.Currency,
+            Source = snapshot.Source,
+            RetrievedAtUtc = snapshot.RetrievedAtUtc,
+            CreatedAtUtc = snapshot.CreatedAtUtc
         };
     }
 

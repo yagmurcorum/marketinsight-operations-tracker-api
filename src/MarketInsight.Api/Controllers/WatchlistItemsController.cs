@@ -1,5 +1,7 @@
+using MarketInsight.Api.DTOs.Quotes;
 using MarketInsight.Api.DTOs.Watchlist;
 using MarketInsight.Api.Services;
+using MarketInsight.Api.Services.Quotes;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MarketInsight.Api.Controllers;
@@ -12,14 +14,19 @@ namespace MarketInsight.Api.Controllers;
 public class WatchlistItemsController : ControllerBase
 {
     private readonly IWatchlistItemService _watchlistItemService;
+    private readonly IQuoteRefreshService _quoteRefreshService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WatchlistItemsController"/> class.
     /// </summary>
     /// <param name="watchlistItemService">The watchlist item service.</param>
-    public WatchlistItemsController(IWatchlistItemService watchlistItemService)
+    /// <param name="quoteRefreshService">The quote refresh service.</param>
+    public WatchlistItemsController(
+        IWatchlistItemService watchlistItemService,
+        IQuoteRefreshService quoteRefreshService)
     {
         _watchlistItemService = watchlistItemService;
+        _quoteRefreshService = quoteRefreshService;
     }
 
     /// <summary>
@@ -89,6 +96,63 @@ public class WatchlistItemsController : ControllerBase
         return Created(
             $"/api/watchlist-items/{result.Item!.Symbol}",
             result.Item);
+    }
+
+    /// <summary>
+    /// Refreshes quote data for an active watchlist symbol.
+    /// </summary>
+    /// <param name="symbol">The requested symbol value.</param>
+    /// <returns>The refreshed quote response if the symbol is active.</returns>
+    [HttpPost("{symbol}/refresh")]
+    [ProducesResponseType(typeof(QuoteRefreshResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult<QuoteRefreshResponse>> RefreshQuoteAsync(string symbol)
+    {
+        var result = await _quoteRefreshService.RefreshQuoteAsync(symbol);
+
+        if (result.IsNotFound)
+        {
+            return NotFound(new
+            {
+                message = result.Message
+            });
+        }
+
+        if (result.IsExternalFailure)
+        {
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message = result.Message
+                });
+        }
+
+        return Ok(result.Response);
+    }
+
+    /// <summary>
+    /// Gets saved price snapshots for an active watchlist symbol.
+    /// </summary>
+    /// <param name="symbol">The requested symbol value.</param>
+    /// <returns>A list of saved price snapshots for the active symbol.</returns>
+    [HttpGet("{symbol}/snapshots")]
+    [ProducesResponseType(typeof(List<PriceSnapshotResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<PriceSnapshotResponse>>> GetPriceSnapshotsAsync(string symbol)
+    {
+        var snapshots = await _quoteRefreshService.GetSnapshotsAsync(symbol);
+
+        if (snapshots is null)
+        {
+            return NotFound(new
+            {
+                message = $"Active watchlist item was not found for symbol {symbol}."
+            });
+        }
+
+        return Ok(snapshots);
     }
 
     /// <summary>
