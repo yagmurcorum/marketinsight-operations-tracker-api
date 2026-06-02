@@ -167,6 +167,13 @@ Planned Watchlist CRUD routes:
 | Create or reactivate watchlist item | POST | `/api/watchlist-items` |
 | Delete or deactivate watchlist item | DELETE | `/api/watchlist-items/{symbol}` |
 
+Quote refresh and snapshot routes also follow the same watchlist route standard:
+
+| Operation | HTTP Method | Route |
+|---|---|---|
+| Refresh quote data for a symbol | POST | `/api/watchlist-items/{symbol}/refresh` |
+| List saved price snapshots for a symbol | GET | `/api/watchlist-items/{symbol}/snapshots` |
+
 ---
 
 ## Watchlist Item Behavior
@@ -233,6 +240,9 @@ Documentation areas:
 | Architecture standards | `docs/architecture` |
 | API contracts | `docs/api-contracts` |
 | Database design | `docs/database-design` |
+| External integrations | `docs/integrations` |
+| Configuration | `docs/configuration` |
+| Cache design | `docs/cache` |
 | Project tracking | `docs/project-tracking` |
 
 Important documentation files:
@@ -245,6 +255,7 @@ Important documentation files:
 | `docs/architecture/layer-responsibility-standard.md` | Controller, Service, Repository, Entity, and DTO responsibility standards, including create, duplicate, soft delete, and reactivation decisions |
 | `docs/architecture/api-route-naming-standard.md` | API route naming rules |
 | `docs/architecture/repository-pattern-and-linq.md` | Repository Pattern, LINQ usage, async EF Core queries, data access separation, active/inactive record lookup, and repository support for soft delete and reactivation flows |
+| `docs/architecture/service-layer-and-quote-refresh-flow.md` | Service-layer boundary and quote refresh flow design |
 | `docs/database-design/entity-design.md` | Entity and DTO model design, including WatchlistItem lifecycle, soft delete, and reactivation behavior |
 | `docs/database-design/entity-relationship-model.md` | Entity relationship model |
 | `docs/database-design/entity-constraint-standards.md` | Symbol uniqueness, normalization, soft delete, reactivation, decimal, UTC, and persistence standards |
@@ -252,8 +263,14 @@ Important documentation files:
 | `docs/api-contracts/xml-summary-swagger-standard.md` | XML Summary and Swagger documentation standard |
 | `docs/api-contracts/api-endpoint-draft.md` | Initial controller endpoint draft and `GET /api/system/info` endpoint documentation |
 | `docs/api-contracts/watchlist-items-api-contract.md` | Watchlist Items API contract, status codes, soft delete, reactivation behavior, and Swagger test flow |
+| `docs/api-contracts/quote-refresh-api-contract.md` | Quote refresh service contract, cache-aside flow, controlled result behavior, and PriceSnapshot persistence rules |
+| `docs/api-contracts/watchlist-quote-endpoints-api-contract.md` | Watchlist quote refresh and snapshot listing endpoint contract |
+| `docs/integrations/public-finance-api-integration.md` | External finance API client flow, external response model, and internal quote DTO structure |
+| `docs/configuration/user-secrets-and-strategy-pattern.md` | User Secrets setup and quote provider abstraction |
+| `docs/cache/redis-cache-design.md` | Redis cache-aside behavior, `quote:{symbol}` key format, 5-minute TTL, and Docker Compose Redis setup |
 | `docs/project-tracking/week-1-summary.md` | Week 1 progress summary |
 | `docs/project-tracking/week-2-database-summary.md` | Week 2 database, Repository Pattern, Watchlist CRUD, soft delete, reactivation, and Swagger verification summary |
+| `docs/project-tracking/week-3-external-api-cache-summary.md` | Week 3 external API, Redis cache, quote refresh, PriceSnapshot persistence, snapshot listing, and Swagger verification summary |
 
 ---
 
@@ -268,11 +285,15 @@ Current documentation and source structure:
     │   ├── architecture/
     │   ├── api-contracts/
     │   ├── database-design/
+    │   ├── integrations/
+    │   ├── configuration/
+    │   ├── cache/
     │   └── project-tracking/
     │
     ├── src/
     │   └── MarketInsight.Api/
     │
+    ├── docker-compose.yml
     ├── MarketInsight.OperationsTracker.sln
     ├── README.md
     └── .gitignore
@@ -317,6 +338,22 @@ Restore dependencies:
 Build the solution:
 
     dotnet build
+
+Start Redis locally with Docker Compose:
+
+    docker compose up -d redis
+
+Verify Redis:
+
+    docker exec -it marketinsight-redis redis-cli ping
+
+Expected response:
+
+    PONG
+
+Configure the external finance API key with User Secrets:
+
+    dotnet user-secrets set "FinanceApi:ApiKey" "YOUR_FINANCE_API_KEY" --project src/MarketInsight.Api
 
 Run the API project:
 
@@ -396,5 +433,7 @@ The repository contains only the backend API component.
 The project uses a learning-focused layered monolith architecture and separates responsibilities across Controller, Service, Repository, Entity, and DTO layers.
 
 The Watchlist Items API uses normalized symbols, soft delete, and reactivation behavior to keep data consistent while providing clear API behavior.
+
+The quote refresh flow uses an external finance API, Redis cache-aside behavior, and SQLite PriceSnapshot persistence while exposing Swagger-testable watchlist quote endpoints.
 
 Detailed technical decisions are documented under the `docs/` folder.

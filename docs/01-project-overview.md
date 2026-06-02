@@ -252,6 +252,13 @@ Planned Watchlist CRUD routes:
 | Create or reactivate watchlist item | POST | `/api/watchlist-items` |
 | Delete or deactivate watchlist item | DELETE | `/api/watchlist-items/{symbol}` |
 
+Additional watchlist quote routes:
+
+| Operation | HTTP Method | Route |
+|---|---|---|
+| Refresh quote data for a symbol | POST | `/api/watchlist-items/{symbol}/refresh` |
+| List saved price snapshots for a symbol | GET | `/api/watchlist-items/{symbol}/snapshots` |
+
 ---
 
 ## Watchlist Item Behavior
@@ -338,6 +345,9 @@ Key documentation areas:
 | Architecture standards | `docs/architecture` |
 | API contracts | `docs/api-contracts` |
 | Database design | `docs/database-design` |
+| External integrations | `docs/integrations` |
+| Configuration | `docs/configuration` |
+| Cache design | `docs/cache` |
 | Project tracking | `docs/project-tracking` |
 
 The README should remain the main repository entry point.
