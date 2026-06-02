@@ -1,4 +1,4 @@
-
+using MarketInsight.Api.Clients.Finance;
 using MarketInsight.Api.Services;
 using System.Reflection;
 using MarketInsight.Api.Data;
@@ -14,6 +14,19 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IWatchlistItemRepository, WatchlistItemRepository>();
 builder.Services.AddScoped<IWatchlistItemService, WatchlistItemService>();
+
+var financeApiBaseUrl = builder.Configuration["FinanceApi:BaseUrl"];
+
+builder.Services.AddHttpClient<IFinanceQuoteClient, FinanceQuoteClient>(client =>
+{
+    if (string.IsNullOrWhiteSpace(financeApiBaseUrl))
+    {
+        throw new InvalidOperationException("Finance API base URL is not configured.");
+    }
+
+    client.BaseAddress = new Uri(financeApiBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 builder.Services.AddEndpointsApiExplorer();
 
