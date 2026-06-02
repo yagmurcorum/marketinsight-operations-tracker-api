@@ -4,8 +4,10 @@ using MarketInsight.Api.Options;
 using MarketInsight.Api.Providers.Quotes;
 using MarketInsight.Api.Repositories;
 using MarketInsight.Api.Services;
+using MarketInsight.Api.Services.Cache;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +39,18 @@ builder.Services.AddHttpClient<IFinanceQuoteClient, FinanceQuoteClient>((service
     client.BaseAddress = new Uri(financeApiOptions.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(10);
 });
+
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+
+if (string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    throw new InvalidOperationException("Redis connection string is not configured.");
+}
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    ConnectionMultiplexer.Connect(redisConnectionString));
+
+builder.Services.AddScoped<IQuoteCacheService, RedisQuoteCacheService>();
 
 builder.Services.AddEndpointsApiExplorer();
 
