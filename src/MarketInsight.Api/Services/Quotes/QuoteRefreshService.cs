@@ -89,6 +89,10 @@ public class QuoteRefreshService : IQuoteRefreshService
                 return QuoteRefreshResult.ExternalFailure(normalizedSymbol);
             }
 
+            _logger.LogInformation(
+                "Quote fetched from external API for symbol {Symbol}.",
+                normalizedSymbol);
+
             await _quoteCacheService.SetQuoteAsync(
                 normalizedSymbol,
                 quote,
