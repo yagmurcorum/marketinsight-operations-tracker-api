@@ -10,9 +10,7 @@ The purpose of this document is to define how queued async refresh requests are 
 
 The project uses a Background Worker to process asynchronous price refresh messages from RabbitMQ.
 
-The async endpoint accepts the request and publishes a message.
-
-The Background Worker consumes that message and triggers the existing quote refresh flow.
+The async endpoint accepts the request and publishes a message. The Background Worker consumes that message and triggers the existing quote refresh flow.
 
 This keeps the HTTP request lightweight and moves the actual processing to a background execution path.
 
@@ -65,16 +63,16 @@ The refresh business logic should remain in QuoteRefreshService.
 
 The Background Worker is responsible for:
 
-• Connecting to RabbitMQ.
-• Declaring the price refresh queue.
-• Consuming PriceRefreshMessage records.
-• Deserializing message content.
-• Reading Symbol and CorrelationId.
-• Creating a logging scope.
-• Resolving IQuoteRefreshService through a service scope.
-• Calling RefreshQuoteAsync.
-• Acknowledging successfully processed messages.
-• Logging failures.
+- Connecting to RabbitMQ.
+- Declaring the price refresh queue.
+- Consuming PriceRefreshMessage records.
+- Deserializing message content.
+- Reading Symbol and CorrelationId.
+- Creating a logging scope.
+- Resolving IQuoteRefreshService through a service scope.
+- Calling RefreshQuoteAsync.
+- Acknowledging successfully processed messages.
+- Logging failures.
 
 The worker is an orchestration component.
 
@@ -86,13 +84,13 @@ It should not contain direct quote refresh business rules.
 
 The worker should not directly:
 
-• Call the external finance API.
-• Read or write Redis cache.
-• Create PriceSnapshot entities manually.
-• Access AppDbContext directly.
-• Decide quote refresh business rules.
-• Implement alert evaluation.
-• Implement advanced retry or dead-letter queue behavior.
+- Call the external finance API.
+- Read or write Redis cache.
+- Create PriceSnapshot entities manually.
+- Access AppDbContext directly.
+- Decide quote refresh business rules.
+- Implement alert evaluation.
+- Implement advanced retry or dead-letter queue behavior.
 
 Those responsibilities either already belong to QuoteRefreshService or are outside the current MVP scope.
 
@@ -210,11 +208,11 @@ QuoteRefreshService owns the quote refresh business flow.
 
 It is responsible for:
 
-• Checking active WatchlistItem state.
-• Reading quote data from Redis if available.
-• Calling the quote provider when cache is missing.
-• Saving PriceSnapshot records.
-• Returning refresh result information.
+- Checking active WatchlistItem state.
+- Reading quote data from Redis if available.
+- Calling the quote provider when cache is missing.
+- Saving PriceSnapshot records.
+- Returning refresh result information.
 
 The worker only calls QuoteRefreshService.
 
@@ -255,11 +253,11 @@ The worker logs key processing events.
 
 Expected logs include:
 
-• Price refresh background worker started consuming queue price-refresh-queue.
-• Async price refresh message consumed for symbol TSLA with correlation id ...
-• Queued price refresh completed for symbol TSLA.
-• Queued price refresh failed for symbol TSLA.
-• Invalid price refresh message received from RabbitMQ.
+- Price refresh background worker started consuming queue price-refresh-queue.
+- Async price refresh message consumed for symbol TSLA with correlation id ...
+- Queued price refresh completed for symbol TSLA.
+- Queued price refresh failed for symbol TSLA.
+- Invalid price refresh message received from RabbitMQ.
 
 The worker uses CorrelationId in the logging scope.
 
@@ -351,21 +349,21 @@ This registration allows the worker to start automatically when the API applicat
 
 After this implementation:
 
-• PriceRefreshBackgroundWorker was created.
-• The worker consumes messages from price-refresh-queue.
-• PriceRefreshMessage records are deserialized.
-• Symbol and CorrelationId are read from the message.
-• CorrelationId is used in the log scope.
-• IQuoteRefreshService is resolved through a service scope.
-• QuoteRefreshService.RefreshQuoteAsync is called by the worker.
-• Existing quote refresh business logic is reused.
-• Refresh logic is not duplicated inside the worker.
-• Successfully processed messages are acknowledged.
-• Failed processing is logged.
-• The worker is registered in Program.cs.
-• Runtime testing confirmed that async refresh messages are consumed.
-• Runtime testing confirmed that PriceSnapshot records are created after worker processing.
-• Project build completed successfully.
+- PriceRefreshBackgroundWorker was created.
+- The worker consumes messages from price-refresh-queue.
+- PriceRefreshMessage records are deserialized.
+- Symbol and CorrelationId are read from the message.
+- CorrelationId is used in the log scope.
+- IQuoteRefreshService is resolved through a service scope.
+- QuoteRefreshService.RefreshQuoteAsync is called by the worker.
+- Existing quote refresh business logic is reused.
+- Refresh logic is not duplicated inside the worker.
+- Successfully processed messages are acknowledged.
+- Failed processing is logged.
+- The worker is registered in Program.cs.
+- Runtime testing confirmed that async refresh messages are consumed.
+- Runtime testing confirmed that PriceSnapshot records are created after worker processing.
+- Project build completed successfully.
 
 ---
 
