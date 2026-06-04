@@ -1,3 +1,4 @@
+using MarketInsight.Api.Messaging;
 using MarketInsight.Api.Clients.Finance;
 using MarketInsight.Api.Data;
 using MarketInsight.Api.Options;
@@ -23,9 +24,11 @@ builder.Services.AddScoped<IPriceSnapshotRepository, PriceSnapshotRepository>();
 
 builder.Services.AddScoped<IWatchlistItemService, WatchlistItemService>();
 builder.Services.AddScoped<IQuoteRefreshService, QuoteRefreshService>();
+builder.Services.AddScoped<IPriceRefreshPublisher, RabbitMqPriceRefreshPublisher>();
 
 builder.Services.Configure<FinanceApiOptions>(
     builder.Configuration.GetSection("FinanceApi"));
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMq"));
 
 builder.Services.AddScoped<IQuoteProvider, FinnhubQuoteProvider>();
 

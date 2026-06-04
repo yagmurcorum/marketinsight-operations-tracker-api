@@ -1,5 +1,6 @@
 using MarketInsight.Api.DTOs.Quotes;
 using MarketInsight.Api.DTOs.Watchlist;
+using MarketInsight.Api.Messaging;
 using MarketInsight.Api.Services;
 using MarketInsight.Api.Services.Quotes;
 using Microsoft.AspNetCore.Mvc;
@@ -15,18 +16,22 @@ public class WatchlistItemsController : ControllerBase
 {
     private readonly IWatchlistItemService _watchlistItemService;
     private readonly IQuoteRefreshService _quoteRefreshService;
+    private readonly IPriceRefreshPublisher _priceRefreshPublisher;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WatchlistItemsController"/> class.
     /// </summary>
     /// <param name="watchlistItemService">The watchlist item service.</param>
     /// <param name="quoteRefreshService">The quote refresh service.</param>
+    /// <param name="priceRefreshPublisher">The price refresh message publisher.</param>
     public WatchlistItemsController(
         IWatchlistItemService watchlistItemService,
-        IQuoteRefreshService quoteRefreshService)
+        IQuoteRefreshService quoteRefreshService,
+        IPriceRefreshPublisher priceRefreshPublisher)
     {
         _watchlistItemService = watchlistItemService;
         _quoteRefreshService = quoteRefreshService;
+        _priceRefreshPublisher = priceRefreshPublisher;
     }
 
     /// <summary>
@@ -130,6 +135,47 @@ public class WatchlistItemsController : ControllerBase
         }
 
         return Ok(result.Response);
+    }
+
+    /// <summary>
+    /// Queues an asynchronous price refresh request for an active watchlist symbol.
+    /// </summary>
+    /// <param name="symbol">The requested symbol value.</param>
+    /// <returns>The queued asynchronous price refresh response.</returns>
+    [HttpPost("{symbol}/refresh-async")]
+    [ProducesResponseType(typeof(AsyncPriceRefreshResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AsyncPriceRefreshResponse>> RefreshQuoteAsyncQueued(string symbol)
+    {
+        var normalizedSymbol = symbol.Trim().ToUpperInvariant();
+
+        var item = await _watchlistItemService.GetBySymbolAsync(normalizedSymbol);
+
+        if (item is null)
+        {
+            return NotFound(new
+            {
+                message = $"Active watchlist item with symbol '{normalizedSymbol}' was not found."
+            });
+        }
+
+        var message = new PriceRefreshMessage
+        {
+            Symbol = normalizedSymbol,
+            RequestedAtUtc = DateTime.UtcNow,
+            CorrelationId = HttpContext.TraceIdentifier
+        };
+
+        await _priceRefreshPublisher.PublishAsync(message, HttpContext.RequestAborted);
+
+        var response = new AsyncPriceRefreshResponse
+        {
+            Message = "Price refresh request accepted.",
+            Symbol = normalizedSymbol,
+            Status = "Queued"
+        };
+
+        return Accepted(response);
     }
 
     /// <summary>
