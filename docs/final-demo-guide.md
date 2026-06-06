@@ -29,7 +29,6 @@ The purpose is to explain how the backend flow works, why each component exists,
 
 ---
 
-
 ## Explanation Focus
 
 - Problem definition.
@@ -40,26 +39,6 @@ The purpose is to explain how the backend flow works, why each component exists,
 - Async processing.
 - Observability.
 - Documentation and project tracking.
-
----
-
-## Recommended Demo Duration
-
-Recommended technical demo duration:
-
-    15 minutes
-
-Suggested structure:
-
-| Section | Duration |
-|---|---|
-| Project introduction | 1 minute |
-| Architecture and tech stack | 3 minutes |
-| Swagger endpoint demo | 7 minutes |
-| Redis, RabbitMQ, Worker and logging explanation | 3 minutes |
-| Documentation and project tracking summary | 1 minute |
-
-The remaining meeting time can be used for questions and discussion.
 
 ---
 
@@ -483,6 +462,12 @@ Important explanation:
     Redis stores short-term quote data.
     SQLite stores persistent PriceSnapshot history.
 
+Important note:
+
+    WatchlistItem.UpdatedAtUtc represents the lifecycle update time of the watchlist item itself.
+    Quote refresh does not update WatchlistItem.UpdatedAtUtc.
+    Quote refresh results should be verified through PriceSnapshot records and refresh logs.
+
 ---
 
 ## Async Refresh Demo
@@ -505,9 +490,16 @@ Expected response:
         "status": "Queued"
     }
 
+If the requested symbol does not exist or is inactive, the endpoint returns:
+
+    404 Not Found
+
+In this case, no RabbitMQ message is published.
+
 Purpose:
 
     Shows that the API accepts the request and queues the work instead of processing everything inside the HTTP request.
+    It also prevents unnecessary queue messages for symbols that are not actively tracked.
 
 ---
 
