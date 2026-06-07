@@ -651,6 +651,10 @@ Configure the external finance API key with User Secrets:
 
     dotnet user-secrets set "FinanceApi:ApiKey" "YOUR_FINANCE_API_KEY" --project src/MarketInsight.Api
 
+Apply EF Core migrations:
+
+    dotnet ef database update --project src/MarketInsight.Api/MarketInsight.Api.csproj
+
 Run the API project:
 
     dotnet run --project src/MarketInsight.Api/MarketInsight.Api.csproj
